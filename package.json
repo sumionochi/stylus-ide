@@ -6,7 +6,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "next lint",
+    "setup": "node scripts/setup.js",
+    "check-env": "node scripts/check-env.js"
   },
   "dependencies": {
     "@monaco-editor/react": "^4.7.0",
