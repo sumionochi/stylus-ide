@@ -4,11 +4,12 @@ import { randomUUID } from "crypto";
 import { cleanupProject, getProjectPath } from "@/lib/file-utils";
 import { runCargoStylusCheck, parseCompilationErrors } from "@/lib/compilation";
 
+export const runtime = "nodejs";
 export const maxDuration = 120;
 
 export async function POST(request: NextRequest) {
   const sessionId = randomUUID();
-  let projectPath = "";
+  const projectPath = getProjectPath(sessionId);
 
   try {
     const body = await request.json();
@@ -18,24 +19,18 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Code is required" }, { status: 400 });
     }
 
-    projectPath = getProjectPath(sessionId);
-
-    // Run compilation (creates project via cargo stylus new + compiles)
     const result = await runCargoStylusCheck(projectPath, code);
 
-    // Parse errors if compilation failed
-    let parsedErrors: any[] = [];
-    if (!result.success && result.output.length > 0) {
-      const stderrContent = result.output
-        .filter((o) => o.type === "stderr")
-        .map((o) => o.data)
-        .join("\n");
+    // Parse errors from stderr
+    const stderrContent = result.output
+      .filter((o) => o.type === "stderr")
+      .map((o) => o.data)
+      .join("\n");
 
-      parsedErrors = parseCompilationErrors(stderrContent);
-    }
-
-    // Cleanup
-    await cleanupProject(sessionId);
+    const parsedErrors =
+      !result.success && stderrContent.length > 0
+        ? parseCompilationErrors(stderrContent)
+        : [];
 
     return NextResponse.json({
       success: result.success,
@@ -45,10 +40,6 @@ export async function POST(request: NextRequest) {
       sessionId,
     });
   } catch (error) {
-    if (projectPath) {
-      await cleanupProject(sessionId);
-    }
-
     console.error("Compilation error:", error);
     return NextResponse.json(
       {
@@ -57,5 +48,7 @@ export async function POST(request: NextRequest) {
       },
       { status: 500 }
     );
+  } finally {
+    await cleanupProject(sessionId);
   }
 }

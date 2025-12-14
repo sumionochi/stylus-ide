@@ -1,23 +1,19 @@
-//constants.ts
 export const COMPILATION_CONSTANTS = {
   COMMANDS: {
-    CHECK: ["stylus", "check"],
+    BUILD: ["build", "--target", "wasm32-unknown-unknown", "--release"], // Local WASM compilation
+    CHECK: ["stylus", "check", "--endpoint"], // For Phase 2 (will add RPC URL)
     EXPORT_ABI: ["stylus", "export-abi", "--json"],
   },
 
-  // SDK 0.6.0 with pinned alloy versions
-  DEPENDENCIES: {
-    "stylus-sdk": "0.6.0",
-    "alloy-primitives": "=0.7.6",
-    "alloy-sol-types": "=0.7.6",
-    "mini-alloc": "0.4.2",
-  },
-
-  RUST_VERSION: "1.81",
+  // Keep in sync with rust-toolchain.toml template
+  RUST_TOOLCHAIN_CHANNEL: "1.87.0",
 
   TEMP_BASE: ".stylus-temp",
   COMPILE_TIMEOUT: 120000,
   PROCESS_TIMEOUT: 180000,
+
+  // Stylus WASM size limit (24KB)
+  MAX_WASM_SIZE: 24 * 1024,
 };
 
 export const ERROR_MESSAGES = {
@@ -27,4 +23,6 @@ export const ERROR_MESSAGES = {
   COMPILATION_FAILED: "Compilation failed. Check output for details.",
   TIMEOUT: "Compilation timed out after 2 minutes.",
   WASM_TARGET_MISSING: "WASM target not installed for Rust toolchain",
+  WASM_TOO_LARGE:
+    "WASM binary exceeds 24KB size limit. Try optimizing with opt-level = 's' or 'z'",
 };

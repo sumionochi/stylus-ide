@@ -2,12 +2,18 @@
 import { NextRequest } from "next/server";
 import { randomUUID } from "crypto";
 import { cleanupProject, getProjectPath } from "@/lib/file-utils";
-import { runCargoStylusCheck, CompilationOutput } from "@/lib/compilation";
+import {
+  runCargoStylusCheck,
+  CompilationOutput,
+  parseCompilationErrors,
+} from "@/lib/compilation";
 
+export const runtime = "nodejs";
 export const maxDuration = 120;
 
 export async function POST(request: NextRequest) {
   const sessionId = randomUUID();
+  const projectPath = getProjectPath(sessionId);
 
   try {
     const body = await request.json();
@@ -21,32 +27,43 @@ export async function POST(request: NextRequest) {
     const stream = new TransformStream();
     const writer = stream.writable.getWriter();
 
-    const projectPath = getProjectPath(sessionId);
-
-    // Start compilation in background
     (async () => {
+      const stderrChunks: string[] = [];
+
       try {
-        // Send initial message
         await writer.write(
           encoder.encode(
             `data: ${JSON.stringify({ type: "start", sessionId })}\n\n`
           )
         );
 
-        // Run compilation with streaming output
-        await runCargoStylusCheck(
+        const result = await runCargoStylusCheck(
           projectPath,
           code,
-          async (output: CompilationOutput) => {
+          async (out: CompilationOutput) => {
+            if (out.type === "stderr") stderrChunks.push(out.data);
             await writer.write(
-              encoder.encode(`data: ${JSON.stringify(output)}\n\n`)
+              encoder.encode(`data: ${JSON.stringify(out)}\n\n`)
             );
           }
         );
 
-        // Cleanup
-        await cleanupProject(sessionId);
-        await writer.close();
+        const stderr = stderrChunks.join("\n");
+        const errors =
+          !result.success && stderr.length > 0
+            ? parseCompilationErrors(stderr)
+            : [];
+
+        await writer.write(
+          encoder.encode(
+            `data: ${JSON.stringify({
+              type: "result",
+              success: result.success,
+              exitCode: result.exitCode,
+              errors,
+            })}\n\n`
+          )
+        );
       } catch (error) {
         await writer.write(
           encoder.encode(
@@ -56,6 +73,7 @@ export async function POST(request: NextRequest) {
             })}\n\n`
           )
         );
+      } finally {
         await cleanupProject(sessionId);
         await writer.close();
       }

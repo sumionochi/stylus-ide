@@ -1,6 +1,7 @@
 //file-utils.ts
 import fs from "fs/promises";
 import path from "path";
+import { COMPILATION_CONSTANTS } from "./constants";
 
 export async function createProjectStructure(projectPath: string) {
   const srcPath = path.join(projectPath, "src");
@@ -27,7 +28,11 @@ export async function writeProjectFiles(
 }
 
 export async function cleanupProject(sessionId: string) {
-  const projectPath = path.join(process.cwd(), ".stylus-temp", sessionId);
+  const projectPath = path.join(
+    process.cwd(),
+    COMPILATION_CONSTANTS.TEMP_BASE,
+    sessionId
+  );
   try {
     await fs.rm(projectPath, { recursive: true, force: true });
   } catch (error) {
@@ -36,5 +41,5 @@ export async function cleanupProject(sessionId: string) {
 }
 
 export function getProjectPath(sessionId: string): string {
-  return path.join(process.cwd(), ".stylus-temp", sessionId);
+  return path.join(process.cwd(), COMPILATION_CONSTANTS.TEMP_BASE, sessionId);
 }

@@ -1,4 +1,3 @@
-//compilation.ts
 import { spawn } from "child_process";
 import { COMPILATION_CONSTANTS, ERROR_MESSAGES } from "./constants";
 import { createProjectStructure, writeProjectFiles } from "./file-utils";
@@ -8,9 +7,11 @@ import {
   MAIN_RS_TEMPLATE,
   GITIGNORE_TEMPLATE,
 } from "./cargo-template";
+import path from "path";
+import fs from "fs/promises";
 
 export interface CompilationOutput {
-  type: "stdout" | "stderr" | "error" | "complete";
+  type: "stdout" | "stderr" | "error" | "complete" | "result";
   data: string;
   timestamp?: number;
 }
@@ -23,22 +24,29 @@ export interface CompilationResult {
   error?: string;
 }
 
-// Install WASM target for the Rust version in rust-toolchain.toml
+function stripAnsi(input: string) {
+  return input.replace(/\x1B\[[0-?]*[ -/]*[@-~]/g, "");
+}
+
+// Install WASM target for the pinned toolchain
 async function installWasmTarget(projectPath: string): Promise<boolean> {
   return new Promise((resolve) => {
-    const proc = spawn("rustup", ["target", "add", "wasm32-unknown-unknown"], {
+    const args = [
+      "target",
+      "add",
+      "wasm32-unknown-unknown",
+      "--toolchain",
+      COMPILATION_CONSTANTS.RUST_TOOLCHAIN_CHANNEL,
+    ];
+
+    const proc = spawn("rustup", args, {
       cwd: projectPath,
       shell: false,
       env: process.env,
     });
 
-    proc.on("close", (code) => {
-      resolve(code === 0);
-    });
-
-    proc.on("error", () => {
-      resolve(false);
-    });
+    proc.on("close", (code) => resolve(code === 0));
+    proc.on("error", () => resolve(false));
   });
 }
 
@@ -51,14 +59,26 @@ async function generateLockfile(projectPath: string): Promise<boolean> {
       env: process.env,
     });
 
-    proc.on("close", (code) => {
-      resolve(code === 0);
-    });
-
-    proc.on("error", () => {
-      resolve(false);
-    });
+    proc.on("close", (code) => resolve(code === 0));
+    proc.on("error", () => resolve(false));
   });
+}
+
+// Get WASM file size
+async function getWasmSize(projectPath: string): Promise<number | null> {
+  try {
+    const wasmPath = path.join(
+      projectPath,
+      "target",
+      "wasm32-unknown-unknown",
+      "release",
+      "stylus_hello_world.wasm"
+    );
+    const stats = await fs.stat(wasmPath);
+    return stats.size;
+  } catch {
+    return null;
+  }
 }
 
 export async function runCargoStylusCheck(
@@ -67,10 +87,10 @@ export async function runCargoStylusCheck(
   onOutput?: (output: CompilationOutput) => void
 ): Promise<CompilationResult> {
   try {
-    // STEP 1: Create project structure manually
+    // STEP 1: Create project structure
     const { srcPath } = await createProjectStructure(projectPath);
 
-    // STEP 2: Write all project files with exact SDK 0.6.0 versions
+    // STEP 2: Write project files (Cargo.toml + rust-toolchain.toml + src/lib.rs + src/main.rs)
     await writeProjectFiles(
       projectPath,
       srcPath,
@@ -81,44 +101,34 @@ export async function runCargoStylusCheck(
       GITIGNORE_TEMPLATE
     );
 
-    // STEP 3: Install WASM target for Rust 1.81
+    // STEP 3: Ensure wasm target exists for the pinned toolchain
     const wasmInstalled = await installWasmTarget(projectPath);
     if (!wasmInstalled) {
       return {
         success: false,
         exitCode: -1,
-        output: [
-          {
-            type: "error",
-            data: "Failed to install wasm32-unknown-unknown target",
-          },
-        ],
-        error: "Failed to install wasm32-unknown-unknown target",
+        output: [{ type: "error", data: ERROR_MESSAGES.WASM_TARGET_MISSING }],
+        error: ERROR_MESSAGES.WASM_TARGET_MISSING,
       };
     }
 
-    // STEP 4: Generate Cargo.lock
+    // STEP 4: Generate Cargo.lock (helps reproducibility)
     const lockfileGenerated = await generateLockfile(projectPath);
     if (!lockfileGenerated) {
       return {
         success: false,
         exitCode: -1,
-        output: [
-          {
-            type: "error",
-            data: "Failed to generate Cargo.lock file",
-          },
-        ],
+        output: [{ type: "error", data: "Failed to generate Cargo.lock file" }],
         error: "Failed to generate Cargo.lock file",
       };
     }
 
-    // STEP 5: Run cargo stylus check
-    return new Promise((resolve) => {
+    // STEP 5: Run cargo build (LOCAL COMPILATION - NO RPC NEEDED)
+    return await new Promise((resolve) => {
       const output: CompilationOutput[] = [];
       const startTime = Date.now();
 
-      const proc = spawn("cargo", COMPILATION_CONSTANTS.COMMANDS.CHECK, {
+      const proc = spawn("cargo", COMPILATION_CONSTANTS.COMMANDS.BUILD, {
         cwd: projectPath,
         shell: false,
         env: {
@@ -129,14 +139,14 @@ export async function runCargoStylusCheck(
       });
 
       const timeout = setTimeout(() => {
-        proc.kill("SIGTERM");
-        const timeoutOutput: CompilationOutput = {
+        proc.kill();
+        const msg: CompilationOutput = {
           type: "error",
           data: ERROR_MESSAGES.TIMEOUT,
           timestamp: Date.now() - startTime,
         };
-        output.push(timeoutOutput);
-        onOutput?.(timeoutOutput);
+        output.push(msg);
+        onOutput?.(msg);
 
         resolve({
           success: false,
@@ -147,34 +157,34 @@ export async function runCargoStylusCheck(
       }, COMPILATION_CONSTANTS.COMPILE_TIMEOUT);
 
       proc.stdout.on("data", (data) => {
-        const outputItem: CompilationOutput = {
+        const msg: CompilationOutput = {
           type: "stdout",
           data: data.toString(),
           timestamp: Date.now() - startTime,
         };
-        output.push(outputItem);
-        onOutput?.(outputItem);
+        output.push(msg);
+        onOutput?.(msg);
       });
 
       proc.stderr.on("data", (data) => {
-        const outputItem: CompilationOutput = {
+        const msg: CompilationOutput = {
           type: "stderr",
           data: data.toString(),
           timestamp: Date.now() - startTime,
         };
-        output.push(outputItem);
-        onOutput?.(outputItem);
+        output.push(msg);
+        onOutput?.(msg);
       });
 
       proc.on("error", (error) => {
         clearTimeout(timeout);
-        const errorOutput: CompilationOutput = {
+        const msg: CompilationOutput = {
           type: "error",
           data: error.message,
           timestamp: Date.now() - startTime,
         };
-        output.push(errorOutput);
-        onOutput?.(errorOutput);
+        output.push(msg);
+        onOutput?.(msg);
 
         resolve({
           success: false,
@@ -184,20 +194,49 @@ export async function runCargoStylusCheck(
         });
       });
 
-      proc.on("close", (code) => {
+      proc.on("close", async (code) => {
         clearTimeout(timeout);
-        const completeOutput: CompilationOutput = {
+
+        // Get WASM size if compilation succeeded
+        let wasmSize: number | undefined;
+        if (code === 0) {
+          const size = await getWasmSize(projectPath);
+          if (size !== null) {
+            wasmSize = size;
+            const sizeMB = (size / 1024).toFixed(2);
+            const maxMB = (COMPILATION_CONSTANTS.MAX_WASM_SIZE / 1024).toFixed(
+              2
+            );
+
+            // Add size info to output
+            const sizeMsg: CompilationOutput = {
+              type:
+                size > COMPILATION_CONSTANTS.MAX_WASM_SIZE ? "error" : "stdout",
+              data:
+                size > COMPILATION_CONSTANTS.MAX_WASM_SIZE
+                  ? `⚠️  WASM size: ${sizeMB} KB (exceeds ${maxMB} KB limit)`
+                  : `✓ WASM size: ${sizeMB} KB (within ${maxMB} KB limit)`,
+              timestamp: Date.now() - startTime,
+            };
+            output.push(sizeMsg);
+            onOutput?.(sizeMsg);
+          }
+        }
+
+        const msg: CompilationOutput = {
           type: "complete",
-          data: code === 0 ? "Compilation successful" : "Compilation failed",
+          data:
+            code === 0 ? "✓ Compilation successful" : "✗ Compilation failed",
           timestamp: Date.now() - startTime,
         };
-        output.push(completeOutput);
-        onOutput?.(completeOutput);
+        output.push(msg);
+        onOutput?.(msg);
 
         resolve({
           success: code === 0,
           exitCode: code ?? -1,
           output,
+          wasmSize,
         });
       });
     });
@@ -222,16 +261,20 @@ export function parseCompilationErrors(stderr: string): {
   message: string;
 }[] {
   const errors: { line: number; column: number; message: string }[] = [];
+  const clean = stripAnsi(stderr);
 
-  const errorRegex =
-    /error(?:\[E\d+\])?: (.+)\n\s+-->\s+src\/lib\.rs:(\d+):(\d+)/g;
+  // Matches:
+  // error[E0412]: message...
+  //   --> src/lib.rs:16:31
+  const re =
+    /error(?:\[[A-Z0-9]+\])?:\s+(.+?)\n(?:.|\n)*?-->\s+src[\\/]+lib\.rs:(\d+):(\d+)/g;
 
-  let match;
-  while ((match = errorRegex.exec(stderr)) !== null) {
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(clean)) !== null) {
     errors.push({
-      message: match[1].trim(),
-      line: parseInt(match[2]),
-      column: parseInt(match[3]),
+      message: m[1].trim(),
+      line: parseInt(m[2], 10),
+      column: parseInt(m[3], 10),
     });
   }
 
