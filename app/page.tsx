@@ -3,10 +3,11 @@
 import { SetupGuide } from '@/components/setup/SetupGuide';
 import { MonacoEditor } from '@/components/editor/MonacoEditor';
 import { Button } from '@/components/ui/button';
-import { Bot, X, Play, FileCode, Trash2 } from 'lucide-react';
+import { Bot, X, Play, FileCode, Trash2, Clock, CheckCircle2, XCircle, AlertTriangle } from 'lucide-react';
 import { useState } from 'react';
 import { templates, getTemplate } from '@/lib/templates';
 import { useCompilation } from '@/hooks/useCompilation';
+import { stripAnsiCodes, formatCompilationTime } from '@/lib/output-formatter';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -21,18 +22,22 @@ extern crate alloc;
 use stylus_sdk::prelude::*;
 use stylus_sdk::alloy_primitives::U256;
 
-#[global_allocator]
-static ALLOC: mini_alloc::MiniAlloc = mini_alloc::MiniAlloc::INIT;
-
-#[storage]
-#[entrypoint]
-pub struct MyContract {
-    // Add your storage here
+sol_storage! {
+    #[entrypoint]
+    pub struct MyContract {
+        uint256 value;
+    }
 }
 
 #[public]
 impl MyContract {
-    // Add your public functions here
+    pub fn get_value(&self) -> U256 {
+        self.value.get()
+    }
+
+    pub fn set_value(&mut self, new_value: U256) {
+        self.value.set(new_value);
+    }
 }
 `;
 
@@ -40,7 +45,7 @@ export default function HomePage() {
   const [showAIPanel, setShowAIPanel] = useState(false);
   const [showOutput, setShowOutput] = useState(true);
   const [code, setCode] = useState(DEFAULT_CODE);
-  const { isCompiling, output, compile, clearOutput } = useCompilation();
+  const { isCompiling, output, errors, compilationTime, compile, clearOutput } = useCompilation();
 
   const handleCompile = async () => {
     await compile(code, true); // Use streaming
@@ -59,6 +64,19 @@ export default function HomePage() {
     }
   };
 
+  const getOutputIcon = (type: string) => {
+    switch (type) {
+      case 'error':
+        return <XCircle className="h-3 w-3 shrink-0" />;
+      case 'stderr':
+        return <AlertTriangle className="h-3 w-3 shrink-0" />;
+      case 'complete':
+        return <CheckCircle2 className="h-3 w-3 shrink-0" />;
+      default:
+        return null;
+    }
+  };
+
   const getOutputColor = (type: string) => {
     switch (type) {
       case 'error':
@@ -71,6 +89,15 @@ export default function HomePage() {
         return 'text-muted-foreground';
     }
   };
+
+  // Determine overall compilation status
+  const compilationStatus = isCompiling
+    ? 'compiling'
+    : output.some((o) => o.type === 'complete' && o.data.includes('successful'))
+    ? 'success'
+    : output.some((o) => o.type === 'error' || o.type === 'complete')
+    ? 'error'
+    : 'idle';
 
   return (
     <>
@@ -87,6 +114,7 @@ export default function HomePage() {
               disabled={isCompiling}
               size="sm"
               className="hidden sm:flex"
+              variant={compilationStatus === 'success' ? 'default' : 'default'}
             >
               <Play className="h-4 w-4 mr-2" />
               {isCompiling ? 'Compiling...' : 'Compile'}
@@ -139,6 +167,11 @@ export default function HomePage() {
                 <span className="text-sm text-muted-foreground whitespace-nowrap">
                   lib.rs
                 </span>
+                {errors.length > 0 && (
+                  <span className="text-xs bg-red-500/20 text-red-400 px-2 py-0.5 rounded-full">
+                    {errors.length} {errors.length === 1 ? 'error' : 'errors'}
+                  </span>
+                )}
               </div>
 
               {/* Mobile Compile Button */}
@@ -159,6 +192,7 @@ export default function HomePage() {
                 onChange={setCode}
                 onSave={handleSave}
                 readOnly={isCompiling}
+                errors={errors}
               />
             </div>
           </section>
@@ -207,16 +241,30 @@ export default function HomePage() {
           `}
         >
           <div className="h-12 border-b border-border flex items-center justify-between px-4">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-3">
               <span
-                className="text-sm font-medium cursor-pointer"
+                className="text-sm font-medium cursor-pointer flex items-center gap-2"
                 onClick={() => setShowOutput(!showOutput)}
               >
                 Output
+                {compilationStatus === 'success' && (
+                  <CheckCircle2 className="h-4 w-4 text-green-400" />
+                )}
+                {compilationStatus === 'error' && (
+                  <XCircle className="h-4 w-4 text-red-400" />
+                )}
               </span>
+              
               {output.length > 0 && (
                 <span className="text-xs bg-primary/20 text-primary px-2 py-0.5 rounded-full">
                   {output.length}
+                </span>
+              )}
+
+              {compilationTime !== null && (
+                <span className="text-xs text-muted-foreground flex items-center gap-1">
+                  <Clock className="h-3 w-3" />
+                  {formatCompilationTime(compilationTime)}
                 </span>
               )}
             </div>
@@ -256,8 +304,14 @@ export default function HomePage() {
                 </p>
               )}
               {output.map((item, index) => (
-                <div key={index} className={getOutputColor(item.type)}>
-                  {item.data}
+                <div
+                  key={index}
+                  className={`flex items-start gap-2 ${getOutputColor(item.type)}`}
+                >
+                  {getOutputIcon(item.type)}
+                  <span className="flex-1 whitespace-pre-wrap wrap-break-words">
+                    {stripAnsiCodes(item.data)}
+                  </span>
                 </div>
               ))}
             </div>

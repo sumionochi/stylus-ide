@@ -1,12 +1,19 @@
-//useCompilation.ts
 "use client";
 
 import { useState, useCallback } from "react";
 import { CompilationOutput } from "@/lib/compilation";
 
+interface ParsedError {
+  line: number;
+  column: number;
+  message: string;
+}
+
 interface UseCompilationReturn {
   isCompiling: boolean;
   output: CompilationOutput[];
+  errors: ParsedError[];
+  compilationTime: number | null;
   compile: (code: string, streaming?: boolean) => Promise<void>;
   clearOutput: () => void;
 }
@@ -14,10 +21,15 @@ interface UseCompilationReturn {
 export function useCompilation(): UseCompilationReturn {
   const [isCompiling, setIsCompiling] = useState(false);
   const [output, setOutput] = useState<CompilationOutput[]>([]);
+  const [errors, setErrors] = useState<ParsedError[]>([]);
+  const [compilationTime, setCompilationTime] = useState<number | null>(null);
 
   const compile = useCallback(async (code: string, streaming = false) => {
     setIsCompiling(true);
     setOutput([]);
+    setErrors([]);
+    setCompilationTime(null);
+    const startTime = Date.now();
 
     try {
       if (streaming) {
@@ -52,9 +64,16 @@ export function useCompilation(): UseCompilationReturn {
             if (line.startsWith("data: ")) {
               const data = JSON.parse(line.slice(6));
               setOutput((prev) => [...prev, data]);
+
+              // Handle result message with parsed errors
+              if (data.type === "result" && data.errors) {
+                setErrors(data.errors);
+              }
             }
           }
         }
+
+        setCompilationTime(Date.now() - startTime);
       } else {
         // Regular POST request
         const response = await fetch("/api/compile", {
@@ -67,14 +86,17 @@ export function useCompilation(): UseCompilationReturn {
 
         if (result.output) {
           setOutput(result.output);
-        } else if (result.error) {
-          setOutput([
-            {
-              type: "error",
-              data: result.error,
-            },
-          ]);
         }
+
+        if (result.errors) {
+          setErrors(result.errors);
+        }
+
+        if (result.error) {
+          setOutput([{ type: "error", data: result.error }]);
+        }
+
+        setCompilationTime(Date.now() - startTime);
       }
     } catch (error) {
       setOutput([
@@ -83,6 +105,7 @@ export function useCompilation(): UseCompilationReturn {
           data: error instanceof Error ? error.message : "Compilation failed",
         },
       ]);
+      setCompilationTime(Date.now() - startTime);
     } finally {
       setIsCompiling(false);
     }
@@ -90,11 +113,15 @@ export function useCompilation(): UseCompilationReturn {
 
   const clearOutput = useCallback(() => {
     setOutput([]);
+    setErrors([]);
+    setCompilationTime(null);
   }, []);
 
   return {
     isCompiling,
     output,
+    errors,
+    compilationTime,
     compile,
     clearOutput,
   };
