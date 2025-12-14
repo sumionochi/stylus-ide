@@ -1,0 +1,65 @@
+export const CARGO_TOML_TEMPLATE = `[package]
+name = "stylus-hello-world"
+version = "0.1.11"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+homepage = "https://github.com/OffchainLabs/stylus-hello-world"
+repository = "https://github.com/OffchainLabs/stylus-hello-world"
+keywords = ["arbitrum", "ethereum", "stylus", "alloy"]
+description = "Stylus hello world example"
+
+[dependencies]
+alloy-primitives = "=0.8.20"
+alloy-sol-types = "=0.8.20"
+stylus-sdk = "0.9.0"
+hex = { version = "0.4", default-features = false }
+
+[dev-dependencies]
+alloy-primitives = { version = "=0.8.20", features = ["sha3-keccak"] }
+tokio = { version = "1.12.0", features = ["full"] }
+ethers = "2.0"
+eyre = "0.6.8"
+stylus-sdk = { version = "0.9.0", features = ["stylus-test"] }
+dotenv = "0.15.0"
+
+[features]
+default = ["mini-alloc"]
+export-abi = ["stylus-sdk/export-abi"]
+debug = ["stylus-sdk/debug"]
+mini-alloc = ["stylus-sdk/mini-alloc"]
+
+[[bin]]
+name = "stylus-hello-world"
+path = "src/main.rs"
+
+[lib]
+crate-type = ["lib", "cdylib"]
+
+[profile.release]
+codegen-units = 1
+strip = true
+lto = true
+panic = "abort"
+
+# If you need to reduce the binary size, it is advisable to try other
+# optimization levels, such as "s" and "z"
+opt-level = 3`;
+
+export const RUST_TOOLCHAIN_TOML = `[toolchain]
+channel = "1.87.0"
+targets = ["wasm32-unknown-unknown"]
+`;
+
+export const MAIN_RS_TEMPLATE = `#![cfg_attr(not(feature = "export-abi"), no_main)]
+extern crate alloc;
+
+#[global_allocator]
+static ALLOC: mini_alloc::MiniAlloc = mini_alloc::MiniAlloc::INIT;
+
+fn main() {}
+`;
+
+export const GITIGNORE_TEMPLATE = `target/
+.DS_Store
+Cargo.lock
+`;

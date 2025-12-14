@@ -3,9 +3,10 @@
 import { SetupGuide } from '@/components/setup/SetupGuide';
 import { MonacoEditor } from '@/components/editor/MonacoEditor';
 import { Button } from '@/components/ui/button';
-import { Bot, Menu, X, Play, FileCode } from 'lucide-react';
+import { Bot, X, Play, FileCode, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { templates, getTemplate } from '@/lib/templates';
+import { useCompilation } from '@/hooks/useCompilation';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -14,9 +15,14 @@ import {
 } from '@/components/ui/dropdown-menu';
 
 const DEFAULT_CODE = `// Welcome to Stylus IDE
-// Start coding your Arbitrum Stylus smart contract
+#![cfg_attr(not(feature = "export-abi"), no_main)]
+extern crate alloc;
 
 use stylus_sdk::prelude::*;
+use stylus_sdk::alloy_primitives::U256;
+
+#[global_allocator]
+static ALLOC: mini_alloc::MiniAlloc = mini_alloc::MiniAlloc::INIT;
 
 #[storage]
 #[entrypoint]
@@ -34,16 +40,14 @@ export default function HomePage() {
   const [showAIPanel, setShowAIPanel] = useState(false);
   const [showOutput, setShowOutput] = useState(true);
   const [code, setCode] = useState(DEFAULT_CODE);
-  const [isCompiling, setIsCompiling] = useState(false);
+  const { isCompiling, output, compile, clearOutput } = useCompilation();
 
-  const handleCompile = () => {
-    setIsCompiling(true);
-    // Will implement in next step
-    setTimeout(() => setIsCompiling(false), 2000);
+  const handleCompile = async () => {
+    await compile(code, true); // Use streaming
+    setShowOutput(true);
   };
 
   const handleSave = () => {
-    console.log('Save triggered');
     handleCompile();
   };
 
@@ -51,6 +55,20 @@ export default function HomePage() {
     const template = getTemplate(templateId);
     if (template) {
       setCode(template.code);
+      clearOutput();
+    }
+  };
+
+  const getOutputColor = (type: string) => {
+    switch (type) {
+      case 'error':
+        return 'text-red-400';
+      case 'stderr':
+        return 'text-yellow-400';
+      case 'complete':
+        return 'text-green-400';
+      default:
+        return 'text-muted-foreground';
     }
   };
 
@@ -140,6 +158,7 @@ export default function HomePage() {
                 value={code}
                 onChange={setCode}
                 onSave={handleSave}
+                readOnly={isCompiling}
               />
             </div>
           </section>
@@ -154,7 +173,6 @@ export default function HomePage() {
               ${showAIPanel ? 'translate-x-0' : 'translate-x-full lg:translate-x-0'}
             `}
           >
-            {/* Mobile Close Button */}
             <div className="lg:hidden h-14 border-b border-border flex items-center justify-between px-4">
               <span className="font-semibold">AI Assistant</span>
               <Button
@@ -171,7 +189,7 @@ export default function HomePage() {
             </div>
           </aside>
 
-          {/* Backdrop for mobile AI panel */}
+          {/* Backdrop */}
           {showAIPanel && (
             <div
               className="fixed inset-0 bg-background/80 backdrop-blur-sm z-30 lg:hidden"
@@ -188,23 +206,60 @@ export default function HomePage() {
             ${showOutput ? 'h-48 md:h-64' : 'h-12'}
           `}
         >
-          <div
-            className="h-12 border-b border-border flex items-center justify-between px-4 cursor-pointer"
-            onClick={() => setShowOutput(!showOutput)}
-          >
-            <span className="text-sm font-medium">Output</span>
-            <Button variant="ghost" size="sm">
-              {showOutput ? '−' : '+'}
-            </Button>
+          <div className="h-12 border-b border-border flex items-center justify-between px-4">
+            <div className="flex items-center gap-2">
+              <span
+                className="text-sm font-medium cursor-pointer"
+                onClick={() => setShowOutput(!showOutput)}
+              >
+                Output
+              </span>
+              {output.length > 0 && (
+                <span className="text-xs bg-primary/20 text-primary px-2 py-0.5 rounded-full">
+                  {output.length}
+                </span>
+              )}
+            </div>
+            
+            <div className="flex items-center gap-2">
+              {output.length > 0 && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={clearOutput}
+                  className="h-8"
+                >
+                  <Trash2 className="h-3 w-3 mr-1" />
+                  Clear
+                </Button>
+              )}
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowOutput(!showOutput)}
+              >
+                {showOutput ? '−' : '+'}
+              </Button>
+            </div>
           </div>
           
           {showOutput && (
-            <div className="flex-1 overflow-auto p-4 min-h-0 font-mono text-xs">
-              <p className="text-muted-foreground">
-                {isCompiling
-                  ? '> Compiling...\n> Please wait...'
-                  : '> Ready to compile\n> Press Compile or Cmd/Ctrl+S'}
-              </p>
+            <div className="flex-1 overflow-auto p-4 min-h-0 font-mono text-xs space-y-1">
+              {output.length === 0 && !isCompiling && (
+                <p className="text-muted-foreground">
+                  Ready to compile. Press Compile or Cmd/Ctrl+S
+                </p>
+              )}
+              {isCompiling && output.length === 0 && (
+                <p className="text-blue-400 animate-pulse">
+                  Starting compilation...
+                </p>
+              )}
+              {output.map((item, index) => (
+                <div key={index} className={getOutputColor(item.type)}>
+                  {item.data}
+                </div>
+              ))}
             </div>
           )}
         </section>
