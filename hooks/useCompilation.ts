@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { CompilationOutput } from "@/lib/compilation";
 
 interface ParsedError {
@@ -14,6 +14,7 @@ interface UseCompilationReturn {
   output: CompilationOutput[];
   errors: ParsedError[];
   compilationTime: number | null;
+  sessionId: string | null;
   compile: (code: string, streaming?: boolean) => Promise<void>;
   clearOutput: () => void;
 }
@@ -23,17 +24,29 @@ export function useCompilation(): UseCompilationReturn {
   const [output, setOutput] = useState<CompilationOutput[]>([]);
   const [errors, setErrors] = useState<ParsedError[]>([]);
   const [compilationTime, setCompilationTime] = useState<number | null>(null);
+  const [sessionId, setSessionId] = useState<string | null>(null);
+
+  // Cleanup old projects periodically
+  useEffect(() => {
+    const cleanupInterval = setInterval(() => {
+      fetch("/api/cleanup", { method: "POST" }).catch(() => {
+        // Ignore cleanup errors
+      });
+    }, 5 * 60 * 1000); // Every 5 minutes
+
+    return () => clearInterval(cleanupInterval);
+  }, []);
 
   const compile = useCallback(async (code: string, streaming = false) => {
     setIsCompiling(true);
     setOutput([]);
     setErrors([]);
     setCompilationTime(null);
+    setSessionId(null);
     const startTime = Date.now();
 
     try {
       if (streaming) {
-        // Server-Sent Events streaming
         const response = await fetch("/api/compile-stream", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -65,7 +78,10 @@ export function useCompilation(): UseCompilationReturn {
               const data = JSON.parse(line.slice(6));
               setOutput((prev) => [...prev, data]);
 
-              // Handle result message with parsed errors
+              if (data.type === "start" && data.sessionId) {
+                setSessionId(data.sessionId);
+              }
+
               if (data.type === "result" && data.errors) {
                 setErrors(data.errors);
               }
@@ -75,7 +91,6 @@ export function useCompilation(): UseCompilationReturn {
 
         setCompilationTime(Date.now() - startTime);
       } else {
-        // Regular POST request
         const response = await fetch("/api/compile", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -83,6 +98,10 @@ export function useCompilation(): UseCompilationReturn {
         });
 
         const result = await response.json();
+
+        if (result.sessionId) {
+          setSessionId(result.sessionId);
+        }
 
         if (result.output) {
           setOutput(result.output);
@@ -122,6 +141,7 @@ export function useCompilation(): UseCompilationReturn {
     output,
     errors,
     compilationTime,
+    sessionId,
     compile,
     clearOutput,
   };

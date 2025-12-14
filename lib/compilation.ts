@@ -1,3 +1,4 @@
+//compilations.ts
 import { spawn } from "child_process";
 import { COMPILATION_CONSTANTS, ERROR_MESSAGES } from "./constants";
 import { createProjectStructure, writeProjectFiles } from "./file-utils";
@@ -279,4 +280,164 @@ export function parseCompilationErrors(stderr: string): {
   }
 
   return errors;
+}
+
+export interface CompilationOutput {
+  type: "stdout" | "stderr" | "error" | "complete" | "result";
+  data: string;
+  timestamp?: number;
+}
+
+type RunResult = {
+  code: number;
+  stdout: string;
+  stderr: string;
+  timedOut: boolean;
+};
+
+function extractFromFirstInterface(text: string): string | null {
+  const idx = text.indexOf("interface ");
+  if (idx === -1) return null;
+  return text.slice(idx).trim();
+}
+
+function extractJsonArray(text: string): string | null {
+  const start = text.indexOf("[");
+  const end = text.lastIndexOf("]");
+  if (start === -1 || end === -1 || end <= start) return null;
+  return text.slice(start, end + 1);
+}
+
+function runCargo(
+  cwd: string,
+  args: string[],
+  timeoutMs: number,
+  onOutput?: (o: CompilationOutput) => void
+): Promise<RunResult> {
+  return new Promise((resolve) => {
+    const start = Date.now();
+    const proc = spawn("cargo", args, {
+      cwd,
+      shell: false,
+      env: {
+        ...process.env,
+        // ✅ don't pollute parsing with colors
+        CARGO_TERM_COLOR: "never",
+      },
+    });
+
+    let stdout = "";
+    let stderr = "";
+    let timedOut = false;
+
+    const timeout = setTimeout(() => {
+      timedOut = true;
+      try {
+        proc.kill("SIGKILL");
+      } catch {}
+    }, timeoutMs);
+
+    proc.stdout.on("data", (d) => {
+      const s = d.toString();
+      stdout += s;
+      onOutput?.({ type: "stdout", data: s, timestamp: Date.now() - start });
+    });
+
+    proc.stderr.on("data", (d) => {
+      const s = d.toString();
+      stderr += s;
+      onOutput?.({ type: "stderr", data: s, timestamp: Date.now() - start });
+    });
+
+    proc.on("error", (e) => {
+      clearTimeout(timeout);
+      resolve({
+        code: -1,
+        stdout,
+        stderr: stderr + `\n${e.message}`,
+        timedOut,
+      });
+    });
+
+    proc.on("close", (code) => {
+      clearTimeout(timeout);
+      resolve({ code: code ?? -1, stdout, stderr, timedOut });
+    });
+  });
+}
+
+export async function exportContractABI(
+  projectPath: string,
+  onOutput?: (output: CompilationOutput) => void
+): Promise<{
+  success: boolean;
+  solidity?: string;
+  abi?: string; // ✅ JSON ABI (prettified)
+  error?: string;
+  details?: string;
+}> {
+  // Keep under your Next route maxDuration=60s
+  const timeoutMs = Math.min(COMPILATION_CONSTANTS.COMPILE_TIMEOUT, 55_000);
+
+  // 1) Solidity interface
+  const solRes = await runCargo(
+    projectPath,
+    ["stylus", "export-abi", "--rust-features=export-abi"],
+    timeoutMs,
+    onOutput
+  );
+
+  const combinedSol = `${solRes.stdout}\n${solRes.stderr}`;
+  const solidity =
+    extractFromFirstInterface(solRes.stdout) ||
+    extractFromFirstInterface(solRes.stderr) ||
+    extractFromFirstInterface(combinedSol);
+
+  if (solRes.timedOut) {
+    return {
+      success: false,
+      error: "ABI export timed out",
+      details: `Timed out after ${timeoutMs}ms\nSTDERR:\n${solRes.stderr}\nSTDOUT:\n${solRes.stdout}`,
+    };
+  }
+
+  if (solRes.code !== 0 || !solidity) {
+    return {
+      success: false,
+      error: "Failed to export Solidity interface",
+      details: `exit=${solRes.code}\nSTDERR:\n${solRes.stderr}\nSTDOUT:\n${solRes.stdout}`,
+    };
+  }
+
+  // 2) JSON ABI (optional; may require solc)
+  const jsonRes = await runCargo(
+    projectPath,
+    ["stylus", "export-abi", "--json", "--rust-features=export-abi"],
+    timeoutMs,
+    onOutput
+  );
+
+  let abi: string | undefined;
+
+  if (jsonRes.code === 0) {
+    const mixed = `${jsonRes.stdout}\n${jsonRes.stderr}`;
+    const jsonPart =
+      extractJsonArray(jsonRes.stdout) ||
+      extractJsonArray(jsonRes.stderr) ||
+      extractJsonArray(mixed);
+
+    if (jsonPart) {
+      try {
+        abi = JSON.stringify(JSON.parse(jsonPart), null, 2);
+      } catch {
+        // ignore parse failures; still return solidity
+      }
+    }
+  }
+
+  return {
+    success: true,
+    solidity,
+    abi,
+  };
 }

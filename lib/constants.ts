@@ -1,18 +1,21 @@
 export const COMPILATION_CONSTANTS = {
   COMMANDS: {
-    BUILD: ["build", "--target", "wasm32-unknown-unknown", "--release"], // Local WASM compilation
-    CHECK: ["stylus", "check", "--endpoint"], // For Phase 2 (will add RPC URL)
-    EXPORT_ABI: ["stylus", "export-abi", "--json"],
+    BUILD: ["build", "--target", "wasm32-unknown-unknown", "--release"],
+    CHECK: ["stylus", "check", "--endpoint"], // For Phase 2
+    EXPORT_ABI: [
+      "run",
+      "--release",
+      "--features",
+      "export-abi",
+      "--bin",
+      "stylus-hello-world",
+    ], // RUN the binary
   },
 
-  // Keep in sync with rust-toolchain.toml template
   RUST_TOOLCHAIN_CHANNEL: "1.87.0",
-
   TEMP_BASE: ".stylus-temp",
   COMPILE_TIMEOUT: 120000,
   PROCESS_TIMEOUT: 180000,
-
-  // Stylus WASM size limit (24KB)
   MAX_WASM_SIZE: 24 * 1024,
 };
 

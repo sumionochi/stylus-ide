@@ -1,4 +1,3 @@
-//file-utils.ts
 import fs from "fs/promises";
 import path from "path";
 import { COMPILATION_CONSTANTS } from "./constants";
@@ -40,6 +39,45 @@ export async function cleanupProject(sessionId: string) {
   }
 }
 
+export async function cleanupOldProjects(maxAgeMinutes: number = 30) {
+  const tempBase = path.join(process.cwd(), COMPILATION_CONSTANTS.TEMP_BASE);
+
+  try {
+    const entries = await fs.readdir(tempBase, { withFileTypes: true });
+    const now = Date.now();
+    const maxAgeMs = maxAgeMinutes * 60 * 1000;
+
+    for (const entry of entries) {
+      if (entry.isDirectory()) {
+        const projectPath = path.join(tempBase, entry.name);
+        try {
+          const stats = await fs.stat(projectPath);
+          const age = now - stats.mtimeMs;
+
+          if (age > maxAgeMs) {
+            await fs.rm(projectPath, { recursive: true, force: true });
+            console.log(`Cleaned up old project: ${entry.name}`);
+          }
+        } catch {
+          // ignore per-project errors
+        }
+      }
+    }
+  } catch {
+    // ignore if temp directory doesn't exist
+  }
+}
+
 export function getProjectPath(sessionId: string): string {
   return path.join(process.cwd(), COMPILATION_CONSTANTS.TEMP_BASE, sessionId);
+}
+
+export async function projectExists(sessionId: string): Promise<boolean> {
+  const projectPath = getProjectPath(sessionId);
+  try {
+    await fs.access(projectPath);
+    return true;
+  } catch {
+    return false;
+  }
 }

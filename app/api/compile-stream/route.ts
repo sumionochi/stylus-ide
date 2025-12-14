@@ -1,7 +1,6 @@
-//compile-stream/route.ts
 import { NextRequest } from "next/server";
 import { randomUUID } from "crypto";
-import { cleanupProject, getProjectPath } from "@/lib/file-utils";
+import { getProjectPath } from "@/lib/file-utils";
 import {
   runCargoStylusCheck,
   CompilationOutput,
@@ -74,7 +73,8 @@ export async function POST(request: NextRequest) {
           )
         );
       } finally {
-        await cleanupProject(sessionId);
+        // DON'T cleanup here - keep project for ABI export
+        // Cleanup will happen on next compilation or via separate cleanup route
         await writer.close();
       }
     })();

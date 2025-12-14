@@ -1,7 +1,6 @@
-//compile/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { randomUUID } from "crypto";
-import { cleanupProject, getProjectPath } from "@/lib/file-utils";
+import { getProjectPath } from "@/lib/file-utils";
 import { runCargoStylusCheck, parseCompilationErrors } from "@/lib/compilation";
 
 export const runtime = "nodejs";
@@ -48,7 +47,5 @@ export async function POST(request: NextRequest) {
       },
       { status: 500 }
     );
-  } finally {
-    await cleanupProject(sessionId);
   }
 }
