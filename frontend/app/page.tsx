@@ -5,7 +5,7 @@ import { MonacoEditor } from '@/components/editor/MonacoEditor';
 import { ABIDialog } from '@/components/abi/ABIDialog';
 import { ConnectButton } from '@/components/wallet/ConnectButton';
 import { Button } from '@/components/ui/button';
-import { Bot, X, Play, FileCode, Trash2, Clock, CheckCircle2, XCircle, AlertTriangle, Download } from 'lucide-react';
+import { Bot, X, Play, FileCode, Trash2, Clock, CheckCircle2, XCircle, AlertTriangle, Download, Brain } from 'lucide-react';
 import { useState } from 'react';
 import { templates, getTemplate } from '@/lib/templates';
 import { useCompilation } from '@/hooks/useCompilation';
@@ -24,6 +24,7 @@ import { FaucetButton } from '@/components/wallet/FaucetButton';
 import { useFileTabs } from '@/hooks/useFileTabs';
 import { FileTabs } from '@/components/editor/FileTabs';
 import { ChatPanel } from '@/components/ai/ChatPanel';
+import Link from 'next/link';
 
 const DEFAULT_CODE = `// Welcome to Stylus IDE
 #![cfg_attr(not(feature = "export-abi"), no_main)]
@@ -268,6 +269,14 @@ export default function HomePage() {
               <Upload className="h-4 w-4 mr-2" />
               Deploy
             </Button>
+
+            {/* ML Demo Link */}
+            <Link href="/ml-demo">
+              <Button variant="outline" size="sm" className="hidden md:flex">
+                <Brain className="h-4 w-4 mr-2" />
+                ML Demo
+              </Button>
+            </Link>
 
             {/* Templates Dropdown */}
             <DropdownMenu>
