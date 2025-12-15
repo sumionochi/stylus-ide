@@ -21,6 +21,8 @@ import { Upload } from 'lucide-react';
 import { useAccount } from 'wagmi';
 import { ContractInteraction } from '@/components/interact/ContractInteraction';
 import { FaucetButton } from '@/components/wallet/FaucetButton';
+import { useFileTabs } from '@/hooks/useFileTabs';
+import { FileTabs } from '@/components/editor/FileTabs';
 
 const DEFAULT_CODE = `// Welcome to Stylus IDE
 #![cfg_attr(not(feature = "export-abi"), no_main)]
@@ -51,7 +53,16 @@ impl MyContract {
 export default function HomePage() {
   const [showAIPanel, setShowAIPanel] = useState(false);
   const [showOutput, setShowOutput] = useState(true);
-  const [code, setCode] = useState(DEFAULT_CODE);
+  const {
+    tabs,
+    activeTabId,
+    activeTab,
+    addTab,
+    removeTab,
+    updateTabContent,
+    setActiveTab,
+    getTabsCode,
+  } = useFileTabs(DEFAULT_CODE);
   const [showABIDialog, setShowABIDialog] = useState(false);
   const [abiData, setAbiData] = useState<{ abi: string | null; solidity: string | null }>({
     abi: null,
@@ -69,24 +80,48 @@ export default function HomePage() {
   const { isCompiling, output, errors, compilationTime, sessionId, compile, clearOutput } = useCompilation();
 
   const handleCompile = async () => {
-    await compile(code, true);
+    // Compile the active tab's code
+    if (!activeTab) return;
+    await compile(activeTab.content, true);
     setShowOutput(true);
+  };
+  
+  const handleSave = () => {
+    handleCompile();
+  };
+  
+  const handleLoadTemplate = (templateId: string) => {
+    const template = getTemplate(templateId);
+    if (template) {
+      // Update active tab or create new one
+      if (activeTab) {
+        updateTabContent(activeTab.id, template.code);
+      }
+      clearOutput();
+    }
+  };
+  
+  const handleNewFile = (type: 'rust' | 'toml' | 'markdown') => {
+    const extensions = {
+      rust: '.rs',
+      toml: '.toml',
+      markdown: '.md',
+    };
+    
+    const languages = {
+      rust: 'rust',
+      toml: 'toml',
+      markdown: 'markdown',
+    };
+  
+    const count = tabs.filter((t) => t.name.includes(extensions[type])).length;
+    const name = `new_file_${count + 1}${extensions[type]}`;
+    
+    addTab(name, '', languages[type]);
   };
 
   const handleDeploySuccess = (contractAddress: string, txHash?: string) => {
     setDeployedContracts((prev) => [...prev, { address: contractAddress, txHash }]);
-  };
-
-  const handleSave = () => {
-    handleCompile();
-  };
-
-  const handleLoadTemplate = (templateId: string) => {
-    const template = getTemplate(templateId);
-    if (template) {
-      setCode(template.code);
-      clearOutput();
-    }
   };
 
   const handleExportABI = async () => {
@@ -274,10 +309,20 @@ export default function HomePage() {
         <div className="flex-1 flex overflow-hidden relative">
           {/* Editor Area */}
           <section className="flex-1 flex flex-col min-w-0">
-            <div className="h-12 border-b border-border flex items-center justify-between px-4 gap-2">
+            {/* File Tabs */}
+            <FileTabs
+              tabs={tabs}
+              activeTabId={activeTabId}
+              onTabClick={setActiveTab}
+              onTabClose={removeTab}
+              onNewFile={handleNewFile}
+            />
+
+            {/* Active Tab Toolbar */}
+            <div className="h-10 border-b border-border flex items-center justify-between px-4 gap-2">
               <div className="flex items-center gap-2 overflow-x-auto">
-                <span className="text-sm text-muted-foreground whitespace-nowrap">
-                  lib.rs
+                <span className="text-xs text-muted-foreground">
+                  {tabs.length} file{tabs.length !== 1 ? 's' : ''}
                 </span>
                 {errors.length > 0 && (
                   <span className="text-xs bg-red-500/20 text-red-400 px-2 py-0.5 rounded-full">
@@ -288,22 +333,30 @@ export default function HomePage() {
 
               <Button
                 onClick={handleCompile}
-                disabled={isCompiling}
+                disabled={isCompiling || !activeTab}
                 size="sm"
-                className="sm:hidden"
+                className="sm:hidden h-7"
               >
-                <Play className="h-4 w-4" />
+                <Play className="h-3 w-3" />
               </Button>
             </div>
 
+            {/* Monaco Editor */}
             <div className="flex-1 bg-card min-h-0">
-              <MonacoEditor
-                value={code}
-                onChange={setCode}
-                onSave={handleSave}
-                readOnly={isCompiling}
-                errors={errors}
-              />
+              {activeTab ? (
+                <MonacoEditor
+                  key={activeTab.id} // Force re-render on tab change
+                  value={activeTab.content}
+                  onChange={(value) => updateTabContent(activeTab.id, value)}
+                  onSave={handleSave}
+                  readOnly={isCompiling}
+                  errors={errors}
+                />
+              ) : (
+                <div className="h-full flex items-center justify-center text-muted-foreground">
+                  No file open
+                </div>
+              )}
             </div>
           </section>
 

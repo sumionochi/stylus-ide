@@ -10,6 +10,7 @@ interface MonacoEditorProps {
   onSave?: () => void;
   readOnly?: boolean;
   errors?: Array<{ line: number; column: number; message: string }>;
+  language?: string;
 }
 
 export function MonacoEditor({
@@ -18,6 +19,7 @@ export function MonacoEditor({
   onSave,
   readOnly = false,
   errors = [],
+  language = 'rust',
 }: MonacoEditorProps) {
   const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
   const monacoRef = useRef<Monaco | null>(null);
@@ -155,7 +157,8 @@ export function MonacoEditor({
   return (
     <Editor
       height="100%"
-      defaultLanguage="rust"
+      defaultLanguage={language}
+      language={language}
       value={value}
       onChange={handleEditorChange}
       onMount={handleEditorDidMount}
