@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -11,6 +11,13 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Loader2, ExternalLink, Copy, Check } from 'lucide-react';
 import { useChainId } from 'wagmi';
 import { arbitrum, arbitrumSepolia } from 'wagmi/chains';
@@ -22,6 +29,19 @@ interface DeployDialogProps {
   onDeploySuccess?: (contractAddress: string, txHash?: string) => void;
 }
 
+const ARBITRUM_SEPOLIA_RPCS = [
+  { name: 'Arbitrum Official', url: 'https://sepolia-rollup.arbitrum.io/rpc' },
+  // ⚠️ demo is rate-limited — replace with your own key
+  { name: 'Alchemy (demo - rate limited)', url: 'https://arb-sepolia.g.alchemy.com/v2/demo' },
+  { name: 'Chainstack', url: 'https://arbitrum-sepolia.core.chainstack.com/rpc/demo' },
+  { name: 'Public Node', url: 'https://arbitrum-sepolia-rpc.publicnode.com' },
+];
+
+const ARBITRUM_ONE_RPCS = [
+  { name: 'Arbitrum Official', url: 'https://arb1.arbitrum.io/rpc' },
+  { name: 'Alchemy (demo - rate limited)', url: 'https://arb-mainnet.g.alchemy.com/v2/demo' },
+];
+
 export function DeployDialog({
   open,
   onOpenChange,
@@ -29,6 +49,7 @@ export function DeployDialog({
   onDeploySuccess,
 }: DeployDialogProps) {
   const [privateKey, setPrivateKey] = useState('');
+  const [selectedRpc, setSelectedRpc] = useState<string>('');
   const [isDeploying, setIsDeploying] = useState(false);
   const [deployResult, setDeployResult] = useState<{
     contractAddress?: string;
@@ -40,11 +61,17 @@ export function DeployDialog({
 
   const chainId = useChainId();
 
-  const getRpcUrl = () => {
-    if (chainId === arbitrumSepolia.id) return 'https://sepolia-rollup.arbitrum.io/rpc';
-    if (chainId === arbitrum.id) return 'https://arb1.arbitrum.io/rpc';
-    return 'https://sepolia-rollup.arbitrum.io/rpc'; // default
-  };
+  const availableRpcs = useMemo(() => {
+    return chainId === arbitrumSepolia.id ? ARBITRUM_SEPOLIA_RPCS : ARBITRUM_ONE_RPCS;
+  }, [chainId]);
+
+  // ✅ Set default RPC safely (no setState during render)
+  useEffect(() => {
+    setSelectedRpc((prev) => {
+      if (prev && availableRpcs.some((r) => r.url === prev)) return prev;
+      return availableRpcs[0]?.url ?? '';
+    });
+  }, [availableRpcs]);
 
   const getExplorerUrl = (address: string) => {
     if (chainId === arbitrumSepolia.id) return `https://sepolia.arbiscan.io/address/${address}`;
@@ -58,22 +85,22 @@ export function DeployDialog({
     return `https://sepolia.arbiscan.io/tx/${txHash}`;
   };
 
-  const resetState = () => {
+  const reset = () => {
     setPrivateKey('');
     setDeployResult(null);
     setCopiedAddress(false);
     setCopiedTx(false);
   };
 
-  // ✅ Dialog expects (open: boolean)
+  // ✅ Dialog expects (open:boolean). Reset only on close.
   const handleOpenChange = (nextOpen: boolean) => {
-    if (!nextOpen) resetState();
+    if (!nextOpen) reset();
     onOpenChange(nextOpen);
   };
 
   const handleDeploy = async () => {
-    if (!sessionId || !privateKey) {
-      alert('Please provide a private key');
+    if (!sessionId || !privateKey || !selectedRpc) {
+      alert('Please provide a private key and select an RPC endpoint');
       return;
     }
 
@@ -84,49 +111,34 @@ export function DeployDialog({
       const response = await fetch('/api/deploy', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          sessionId,
-          privateKey,
-          rpcUrl: getRpcUrl(),
-        }),
+        body: JSON.stringify({ sessionId, privateKey, rpcUrl: selectedRpc }),
       });
 
       const result = await response.json();
 
       if (result.success && result.contractAddress) {
-        setDeployResult({
-          contractAddress: result.contractAddress,
-          txHash: result.txHash,
-        });
+        setDeployResult({ contractAddress: result.contractAddress, txHash: result.txHash });
         onDeploySuccess?.(result.contractAddress, result.txHash);
       } else {
         setDeployResult({ error: result.error || 'Deployment failed' });
       }
     } catch (error) {
-      setDeployResult({
-        error: error instanceof Error ? error.message : 'Deployment failed',
-      });
+      setDeployResult({ error: error instanceof Error ? error.message : 'Deployment failed' });
     } finally {
       setIsDeploying(false);
     }
   };
 
   const copyToClipboard = async (text: string, type: 'address' | 'tx') => {
-    try {
-      await navigator.clipboard.writeText(text);
-      if (type === 'address') {
-        setCopiedAddress(true);
-        setTimeout(() => setCopiedAddress(false), 2000);
-      } else {
-        setCopiedTx(true);
-        setTimeout(() => setCopiedTx(false), 2000);
-      }
-    } catch (err) {
-      console.error('Failed to copy:', err);
+    await navigator.clipboard.writeText(text);
+    if (type === 'address') {
+      setCopiedAddress(true);
+      setTimeout(() => setCopiedAddress(false), 2000);
+    } else {
+      setCopiedTx(true);
+      setTimeout(() => setCopiedTx(false), 2000);
     }
   };
-
-  const close = () => handleOpenChange(false);
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
@@ -142,6 +154,25 @@ export function DeployDialog({
         {!deployResult ? (
           <div className="space-y-4">
             <div className="space-y-2">
+              <Label htmlFor="rpc-select">RPC Endpoint</Label>
+              <Select value={selectedRpc} onValueChange={setSelectedRpc}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select RPC endpoint" />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableRpcs.map((rpc) => (
+                    <SelectItem key={rpc.url} value={rpc.url}>
+                      {rpc.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                If you see **429**, don’t use “Alchemy demo” — use your own key or Public Node.
+              </p>
+            </div>
+
+            <div className="space-y-2">
               <Label htmlFor="private-key">Private Key</Label>
               <Input
                 id="private-key"
@@ -151,23 +182,11 @@ export function DeployDialog({
                 onChange={(e) => setPrivateKey(e.target.value)}
                 disabled={isDeploying}
               />
-              <p className="text-xs text-muted-foreground">
-                ⚠️ Your private key is only used for this deployment and never stored
-              </p>
-            </div>
-
-            <div className="bg-muted p-3 rounded-md text-xs space-y-1">
-              <p className="font-medium">Deployment Details:</p>
-              <p>
-                Network:{' '}
-                {chainId === arbitrumSepolia.id ? 'Arbitrum Sepolia' : 'Arbitrum One'}
-              </p>
-              <p>RPC: {getRpcUrl()}</p>
             </div>
 
             <Button
               onClick={handleDeploy}
-              disabled={isDeploying || !privateKey || !sessionId}
+              disabled={isDeploying || !privateKey || !selectedRpc || !sessionId}
               className="w-full"
             >
               {isDeploying ? (
@@ -183,12 +202,11 @@ export function DeployDialog({
         ) : deployResult.error ? (
           <div className="space-y-4">
             <div className="bg-destructive/10 border border-destructive/20 p-4 rounded-md">
-              <p className="text-sm text-destructive font-medium mb-2">
-                Deployment Failed
+              <p className="text-sm text-destructive font-medium mb-2">Deployment Failed</p>
+              <p className="text-xs text-destructive/80 whitespace-pre-wrap wrap-break-words">
+                {deployResult.error}
               </p>
-              <p className="text-xs text-destructive/80">{deployResult.error}</p>
             </div>
-
             <Button onClick={() => setDeployResult(null)} variant="outline" className="w-full">
               Try Again
             </Button>
@@ -205,22 +223,11 @@ export function DeployDialog({
                     <code className="flex-1 text-xs bg-muted p-2 rounded font-mono break-all">
                       {deployResult.contractAddress}
                     </code>
-
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => copyToClipboard(deployResult.contractAddress!, 'address')}
-                    >
+                    <Button size="sm" variant="ghost" onClick={() => copyToClipboard(deployResult.contractAddress!, 'address')}>
                       {copiedAddress ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
                     </Button>
-
-                    {/* ✅ asChild must wrap an actual <a> */}
                     <Button size="sm" variant="ghost" asChild>
-                      <a
-                        href={getExplorerUrl(deployResult.contractAddress)}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                      >
+                      <a href={getExplorerUrl(deployResult.contractAddress)} target="_blank" rel="noopener noreferrer">
                         <ExternalLink className="h-4 w-4" />
                       </a>
                     </Button>
@@ -235,21 +242,11 @@ export function DeployDialog({
                     <code className="flex-1 text-xs bg-muted p-2 rounded font-mono break-all">
                       {deployResult.txHash}
                     </code>
-
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => copyToClipboard(deployResult.txHash!, 'tx')}
-                    >
+                    <Button size="sm" variant="ghost" onClick={() => copyToClipboard(deployResult.txHash!, 'tx')}>
                       {copiedTx ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
                     </Button>
-
                     <Button size="sm" variant="ghost" asChild>
-                      <a
-                        href={getTxExplorerUrl(deployResult.txHash)}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                      >
+                      <a href={getTxExplorerUrl(deployResult.txHash)} target="_blank" rel="noopener noreferrer">
                         <ExternalLink className="h-4 w-4" />
                       </a>
                     </Button>
@@ -258,7 +255,7 @@ export function DeployDialog({
               )}
             </div>
 
-            <Button onClick={close} className="w-full">
+            <Button onClick={() => handleOpenChange(false)} className="w-full">
               Done
             </Button>
           </div>

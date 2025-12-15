@@ -3,7 +3,7 @@ import { getProjectPath, projectExists } from "@/lib/file-utils";
 import { deployContract } from "@/lib/deployment";
 
 export const runtime = "nodejs";
-export const maxDuration = 180; // 3 minutes for deployment
+export const maxDuration = 180;
 
 export async function POST(request: NextRequest) {
   try {
@@ -47,10 +47,19 @@ export async function POST(request: NextRequest) {
 
     const result = await deployContract(projectPath, privateKey, rpcUrl);
 
+    // deploy/route.ts
     return NextResponse.json({
       success: result.success,
       contractAddress: result.contractAddress,
-      txHash: result.txHash,
+
+      // keep old UI compatibility:
+      txHash: result.activationTxHash ?? result.deploymentTxHash,
+
+      // expose both (better UX):
+      deploymentTxHash: result.deploymentTxHash,
+      activationTxHash: result.activationTxHash,
+      rpcUsed: result.rpcUsed,
+
       error: result.error,
       output: result.output,
     });

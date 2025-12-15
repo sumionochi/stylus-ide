@@ -19,6 +19,8 @@ import {
 import { DeployDialog } from '@/components/deploy/DeployDialog';
 import { Upload } from 'lucide-react';
 import { useAccount } from 'wagmi';
+import { ContractInteraction } from '@/components/interact/ContractInteraction';
+import { FaucetButton } from '@/components/wallet/FaucetButton';
 
 const DEFAULT_CODE = `// Welcome to Stylus IDE
 #![cfg_attr(not(feature = "export-abi"), no_main)]
@@ -196,6 +198,8 @@ export default function HomePage() {
             {/* Connect Wallet */}
             <ConnectButton />
 
+            <FaucetButton />
+
             {/* Compile Button */}
             <Button
               onClick={handleCompile}
@@ -303,7 +307,7 @@ export default function HomePage() {
             </div>
           </section>
 
-          {/* Right Sidebar - AI Panel */}
+          {/* Right Sidebar - AI Panel / Contract Interaction */}
           <aside
             className={`
               fixed lg:relative inset-y-0 right-0 z-40
@@ -314,7 +318,9 @@ export default function HomePage() {
             `}
           >
             <div className="lg:hidden h-14 border-b border-border flex items-center justify-between px-4">
-              <span className="font-semibold">AI Assistant</span>
+              <span className="font-semibold">
+                {deployedContracts.length > 0 ? 'Contract' : 'AI Assistant'}
+              </span>
               <Button
                 variant="ghost"
                 size="icon"
@@ -324,8 +330,17 @@ export default function HomePage() {
               </Button>
             </div>
             
-            <div className="h-full flex items-center justify-center text-muted-foreground text-sm">
-              AI Assistant (Coming in Phase 3)
+            <div className="h-full">
+              {deployedContracts.length > 0 && abiData.abi ? (
+                <ContractInteraction
+                  contractAddress={deployedContracts[deployedContracts.length - 1].address}
+                  abi={abiData.abi}
+                />
+              ) : (
+                <div className="h-full flex items-center justify-center text-muted-foreground text-sm">
+                  AI Assistant (Coming in Phase 3)
+                </div>
+              )}
             </div>
           </aside>
 

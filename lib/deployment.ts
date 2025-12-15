@@ -1,13 +1,46 @@
+// deployment.ts
 import { spawn } from "child_process";
 import { COMPILATION_CONSTANTS } from "./constants";
-import { CompilationOutput } from "./compilation";
+import type { CompilationOutput } from "./compilation";
 
 export interface DeploymentResult {
   success: boolean;
   contractAddress?: string;
-  txHash?: string;
+  deploymentTxHash?: string;
+  activationTxHash?: string;
+  rpcUsed?: string;
   error?: string;
   output: CompilationOutput[];
+}
+
+function stripAnsi(input: string) {
+  return input.replace(/\x1B\[[0-?]*[ -/]*[@-~]/g, "");
+}
+
+function extractDeployInfo(allText: string) {
+  const text = stripAnsi(allText);
+
+  const addr =
+    text.match(/deployed code at address:\s*(0x[a-fA-F0-9]{40})/i)?.[1] ??
+    text.match(/contract address:\s*(0x[a-fA-F0-9]{40})/i)?.[1] ??
+    text.match(/activated at address:\s*(0x[a-fA-F0-9]{40})/i)?.[1];
+
+  const deploymentTx =
+    text.match(/deployment tx hash:\s*(0x[a-fA-F0-9]{64})/i)?.[1] ??
+    text.match(/deployment transaction hash:\s*(0x[a-fA-F0-9]{64})/i)?.[1];
+
+  const activationTx =
+    text.match(/contract activated.*tx hash:\s*(0x[a-fA-F0-9]{64})/i)?.[1] ??
+    text.match(/wasm already activated.*(0x[a-fA-F0-9]{64})/i)?.[1];
+
+  // fallback: first 64-byte hash we can find
+  const anyHash = text.match(/0x[a-fA-F0-9]{64}/)?.[0];
+
+  return {
+    contractAddress: addr,
+    deploymentTxHash: deploymentTx ?? anyHash,
+    activationTxHash: activationTx,
+  };
 }
 
 export async function deployContract(
@@ -18,14 +51,10 @@ export async function deployContract(
 ): Promise<DeploymentResult> {
   return new Promise((resolve) => {
     const output: CompilationOutput[] = [];
-    let contractAddress = "";
-    let txHash = "";
-    let errorDetails = "";
     const startTime = Date.now();
 
-    console.log("Deploying contract...");
-    console.log("RPC:", rpcUrl);
-    console.log("Project path:", projectPath);
+    let stdoutBuf = "";
+    let stderrBuf = "";
 
     const args = [
       "stylus",
@@ -34,7 +63,9 @@ export async function deployContract(
       privateKey,
       "--endpoint",
       rpcUrl,
-      "--no-verify", // Skip verification for now
+      "--no-verify",
+      "--max-fee-per-gas-gwei",
+      "0.5",
     ];
 
     const proc = spawn("cargo", args, {
@@ -42,7 +73,9 @@ export async function deployContract(
       shell: false,
       env: {
         ...process.env,
-        CARGO_TERM_COLOR: "always",
+        // ✅ critical: makes parsing stable
+        CARGO_TERM_COLOR: "never",
+        RUST_LOG: "info",
       },
     });
 
@@ -55,29 +88,17 @@ export async function deployContract(
       };
       output.push(msg);
       onOutput?.(msg);
-
       resolve({
         success: false,
         error: "Deployment timeout",
         output,
+        rpcUsed: rpcUrl,
       });
     }, COMPILATION_CONSTANTS.PROCESS_TIMEOUT);
 
     proc.stdout.on("data", (data) => {
       const text = data.toString();
-      console.log("STDOUT:", text);
-
-      // Extract contract address
-      const addressMatch = text.match(/deployed code at address ([0-9a-fx]+)/i);
-      if (addressMatch) {
-        contractAddress = addressMatch[1];
-      }
-
-      // Extract transaction hash
-      const txMatch = text.match(/transaction hash ([0-9a-fx]+)/i);
-      if (txMatch) {
-        txHash = txMatch[1];
-      }
+      stdoutBuf += text;
 
       const msg: CompilationOutput = {
         type: "stdout",
@@ -90,8 +111,7 @@ export async function deployContract(
 
     proc.stderr.on("data", (data) => {
       const text = data.toString();
-      errorDetails += text;
-      console.log("STDERR:", text);
+      stderrBuf += text;
 
       const msg: CompilationOutput = {
         type: "stderr",
@@ -104,59 +124,53 @@ export async function deployContract(
 
     proc.on("error", (error) => {
       clearTimeout(timeout);
-      console.error("Process error:", error);
-
-      const msg: CompilationOutput = {
-        type: "error",
-        data: error.message,
-        timestamp: Date.now() - startTime,
-      };
-      output.push(msg);
-      onOutput?.(msg);
-
       resolve({
         success: false,
         error: error.message,
         output,
+        rpcUsed: rpcUrl,
       });
     });
 
     proc.on("close", (code) => {
       clearTimeout(timeout);
-      console.log("Deploy process exited with code:", code);
+
+      const combined = stdoutBuf + "\n" + stderrBuf;
+      const { contractAddress, deploymentTxHash, activationTxHash } =
+        extractDeployInfo(combined);
 
       if (code === 0 && contractAddress) {
-        const msg: CompilationOutput = {
-          type: "complete",
-          data: `✓ Deployment successful!\nContract: ${contractAddress}${
-            txHash ? `\nTx: ${txHash}` : ""
-          }`,
-          timestamp: Date.now() - startTime,
-        };
-        output.push(msg);
-        onOutput?.(msg);
-
         resolve({
           success: true,
           contractAddress,
-          txHash,
+          deploymentTxHash,
+          activationTxHash,
           output,
+          rpcUsed: rpcUrl,
         });
-      } else {
-        const msg: CompilationOutput = {
-          type: "error",
-          data: "Deployment failed",
-          timestamp: Date.now() - startTime,
-        };
-        output.push(msg);
-        onOutput?.(msg);
-
-        resolve({
-          success: false,
-          error: errorDetails || "Deployment failed",
-          output,
-        });
+        return;
       }
+
+      // ✅ handle "success but nonzero exit" (rare) if address exists
+      if (contractAddress) {
+        resolve({
+          success: true,
+          contractAddress,
+          deploymentTxHash,
+          activationTxHash,
+          output,
+          rpcUsed: rpcUrl,
+          error: `Non-zero exit code ${code}, but contract address was found.`,
+        });
+        return;
+      }
+
+      resolve({
+        success: false,
+        error: stripAnsi(stderrBuf || "Deployment failed"),
+        output,
+        rpcUsed: rpcUrl,
+      });
     });
   });
 }
