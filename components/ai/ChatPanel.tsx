@@ -4,8 +4,9 @@ import { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Send, Trash2, Loader2, Sparkles } from 'lucide-react';
+import { Send, Trash2, Loader2, Sparkles, Copy, Check } from 'lucide-react';
 import { useChat, type Message } from '@/hooks/useChats';
+import { QuickActions, type QuickAction } from './QuickActions';
 import ReactMarkdown from 'react-markdown';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/cjs/styles/prism';
@@ -22,8 +23,10 @@ export function ChatPanel({
   onInsertCode 
 }: ChatPanelProps) {
   const [input, setInput] = useState('');
+  const [copiedCode, setCopiedCode] = useState<string | null>(null);
   const { messages, isLoading, error, sendMessage, clearMessages } = useChat();
   const scrollRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   // Auto-scroll to bottom on new messages
   useEffect(() => {
@@ -57,6 +60,47 @@ export function ChatPanel({
     }
   };
 
+  const handleQuickAction = (action: QuickAction) => {
+    const prompt = action.prompt(currentCode);
+    setInput(prompt);
+    
+    // Focus textarea and move cursor to end
+    setTimeout(() => {
+      if (textareaRef.current) {
+        textareaRef.current.focus();
+        textareaRef.current.setSelectionRange(prompt.length, prompt.length);
+      }
+    }, 0);
+  };
+
+  const extractCodeFromMessage = (content: string): string[] => {
+    const codeBlocks: string[] = [];
+    const regex = /```(?:rust|rs)?\n([\s\S]*?)```/g;
+    let match;
+    
+    while ((match = regex.exec(content)) !== null) {
+      codeBlocks.push(match[1].trim());
+    }
+    
+    return codeBlocks;
+  };
+
+  const handleCopyCode = async (code: string) => {
+    try {
+      await navigator.clipboard.writeText(code);
+      setCopiedCode(code);
+      setTimeout(() => setCopiedCode(null), 2000);
+    } catch (err) {
+      console.error('Failed to copy:', err);
+    }
+  };
+
+  const handleInsertCode = (code: string) => {
+    if (onInsertCode) {
+      onInsertCode(code);
+    }
+  };
+
   return (
     <div className="h-full flex flex-col">
       {/* Header */}
@@ -81,60 +125,114 @@ export function ChatPanel({
       <ScrollArea className="flex-1 p-4" ref={scrollRef}>
         <div className="space-y-4">
           {messages.length === 0 && (
-            <div className="text-center text-muted-foreground text-sm py-8 space-y-2">
-              <Sparkles className="h-8 w-8 mx-auto mb-3 text-primary" />
-              <p className="font-medium">Hi! I'm your Stylus AI assistant.</p>
-              <p className="text-xs">Ask me anything about Rust smart contracts!</p>
+            <div className="space-y-4">
+              <div className="text-center text-muted-foreground text-sm py-4 space-y-2">
+                <Sparkles className="h-8 w-8 mx-auto mb-3 text-primary" />
+                <p className="font-medium">Hi! I'm your Stylus AI assistant.</p>
+                <p className="text-xs">Ask me anything about Rust smart contracts!</p>
+              </div>
+              
+              {/* Quick Actions - Show when no messages */}
+              <QuickActions
+                onActionClick={handleQuickAction}
+                hasCode={!!currentCode}
+                hasErrors={!!compilationErrors && compilationErrors.length > 0}
+              />
             </div>
           )}
 
-          {messages.map((message) => (
-            <div
-              key={message.id}
-              className={`flex ${
-                message.role === 'user' ? 'justify-end' : 'justify-start'
-              }`}
-            >
-              <div
-                className={`max-w-[85%] rounded-lg p-3 ${
-                  message.role === 'user'
-                    ? 'bg-primary text-primary-foreground'
-                    : 'bg-muted'
-                }`}
-              >
-                {message.role === 'user' ? (
-                  <p className="text-sm whitespace-pre-wrap">{message.content}</p>
-                ) : (
-                  <div className="prose prose-sm dark:prose-invert max-w-none">
-                    <ReactMarkdown
-                    components={{
-                        code({ node, className, children, ...props }: any) {
-                        const match = /language-(\w+)/.exec(className || '');
-                        
-                        return match ? (
-                            <SyntaxHighlighter
-                            style={vscDarkPlus as any}
-                            language={match[1]}
-                            PreTag="div"
-                            className="rounded-md text-xs"
-                            >
-                            {String(children).replace(/\n$/, '')}
-                            </SyntaxHighlighter>
-                        ) : (
-                            <code className={className} {...props}>
-                            {children}
-                            </code>
-                        );
-                        },
-                    }}
-                    >
-                    {message.content}
-                    </ReactMarkdown>
+          {messages.map((message) => {
+            const codeBlocks = message.role === 'assistant' 
+              ? extractCodeFromMessage(message.content)
+              : [];
+
+            return (
+              <div key={message.id}>
+                <div
+                  className={`flex ${
+                    message.role === 'user' ? 'justify-end' : 'justify-start'
+                  }`}
+                >
+                  <div
+                    className={`max-w-[85%] rounded-lg p-3 ${
+                      message.role === 'user'
+                        ? 'bg-primary text-primary-foreground'
+                        : 'bg-muted'
+                    }`}
+                  >
+                    {message.role === 'user' ? (
+                      <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+                    ) : (
+                      <div className="prose prose-sm dark:prose-invert max-w-none">
+                        <ReactMarkdown
+                        components={{
+                            code({ node, className, children, ...props }: any) {
+                            const match = /language-(\w+)/.exec(className || '');
+                            
+                            return match ? (
+                                <SyntaxHighlighter
+                                style={vscDarkPlus as any}
+                                language={match[1]}
+                                PreTag="div"
+                                className="rounded-md text-xs"
+                                >
+                                {String(children).replace(/\n$/, '')}
+                                </SyntaxHighlighter>
+                            ) : (
+                                <code className={className} {...props}>
+                                {children}
+                                </code>
+                            );
+                            },
+                        }}
+                        >
+                        {message.content}
+                        </ReactMarkdown>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Code Action Buttons */}
+                {codeBlocks.length > 0 && (
+                  <div className="flex gap-2 mt-2 ml-2">
+                    {codeBlocks.map((code, index) => (
+                      <div key={index} className="flex gap-1">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleCopyCode(code)}
+                          className="h-7 text-xs"
+                        >
+                          {copiedCode === code ? (
+                            <>
+                              <Check className="h-3 w-3 mr-1" />
+                              Copied
+                            </>
+                          ) : (
+                            <>
+                              <Copy className="h-3 w-3 mr-1" />
+                              Copy
+                            </>
+                          )}
+                        </Button>
+                        {onInsertCode && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleInsertCode(code)}
+                            className="h-7 text-xs"
+                          >
+                            Insert to Editor
+                          </Button>
+                        )}
+                      </div>
+                    ))}
                   </div>
                 )}
               </div>
-            </div>
-          ))}
+            );
+          })}
 
           {isLoading && (
             <div className="flex justify-start">
@@ -156,6 +254,7 @@ export function ChatPanel({
       {/* Input */}
       <div className="p-4 border-t border-border space-y-2">
         <Textarea
+          ref={textareaRef}
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={handleKeyDown}
