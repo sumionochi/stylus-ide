@@ -3,6 +3,7 @@
 import { SetupGuide } from '@/components/setup/SetupGuide';
 import { MonacoEditor } from '@/components/editor/MonacoEditor';
 import { ABIDialog } from '@/components/abi/ABIDialog';
+import { ConnectButton } from '@/components/wallet/ConnectButton';
 import { Button } from '@/components/ui/button';
 import { Bot, X, Play, FileCode, Trash2, Clock, CheckCircle2, XCircle, AlertTriangle, Download } from 'lucide-react';
 import { useState } from 'react';
@@ -15,6 +16,9 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { DeployDialog } from '@/components/deploy/DeployDialog';
+import { Upload } from 'lucide-react';
+import { useAccount } from 'wagmi';
 
 const DEFAULT_CODE = `// Welcome to Stylus IDE
 #![cfg_attr(not(feature = "export-abi"), no_main)]
@@ -52,12 +56,23 @@ export default function HomePage() {
     solidity: null,
   });
   const [isExportingABI, setIsExportingABI] = useState(false);
+  const [showDeployDialog, setShowDeployDialog] = useState(false);
+  const [deployedContracts, setDeployedContracts] = useState<Array<{
+    address: string;
+    txHash?: string;
+  }>>([]);
+
+  const { isConnected } = useAccount();
   
   const { isCompiling, output, errors, compilationTime, sessionId, compile, clearOutput } = useCompilation();
 
   const handleCompile = async () => {
     await compile(code, true);
     setShowOutput(true);
+  };
+
+  const handleDeploySuccess = (contractAddress: string, txHash?: string) => {
+    setDeployedContracts((prev) => [...prev, { address: contractAddress, txHash }]);
   };
 
   const handleSave = () => {
@@ -77,7 +92,7 @@ export default function HomePage() {
       alert('Please compile your contract first');
       return;
     }
-  
+
     setIsExportingABI(true);
     try {
       const response = await fetch('/api/export-abi', {
@@ -85,9 +100,9 @@ export default function HomePage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ sessionId }),
       });
-  
+
       const result = await response.json();
-  
+
       if (result.success) {
         setAbiData({
           abi: result.abi || null,
@@ -95,13 +110,23 @@ export default function HomePage() {
         });
         setShowABIDialog(true);
       } else {
-        // Show detailed error
-        const errorMsg = result.details 
-          ? `${result.error}\n\nDetails:\n${result.details}`
-          : result.error || 'Unknown error';
-        
-        console.error('ABI Export Error:', errorMsg);
-        alert(`ABI export failed:\n${errorMsg}`);
+        if (result.details && result.details.includes('solc not found')) {
+          alert(
+            'solc (Solidity compiler) is required for ABI export.\n\n' +
+            'Install it:\n' +
+            '• macOS: brew install solidity\n' +
+            '• Linux: sudo apt-get install solc\n' +
+            '• Windows: Download from github.com/ethereum/solidity/releases\n\n' +
+            'Then try exporting again.'
+          );
+        } else {
+          const errorMsg = result.details 
+            ? `${result.error}\n\nDetails:\n${result.details}`
+            : result.error || 'Unknown error';
+          
+          console.error('ABI Export Error:', errorMsg);
+          alert(`ABI export failed:\n${errorMsg}`);
+        }
       }
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : 'Unknown error';
@@ -138,7 +163,6 @@ export default function HomePage() {
     }
   };
 
-  // Determine overall compilation status
   const compilationStatus = isCompiling
     ? 'compiling'
     : output.some((o) => o.type === 'complete' && o.data.includes('successful'))
@@ -148,87 +172,104 @@ export default function HomePage() {
     : 'idle';
 
   return (
-      <>
-        <SetupGuide />
-        <ABIDialog
-          open={showABIDialog}
-          onOpenChange={setShowABIDialog}
-          abi={abiData.abi}
-          solidity={abiData.solidity}
-        />
-        
-        <main className="h-screen flex flex-col bg-background">
-          {/* Header */}
-          <header className="h-14 border-b border-border flex items-center justify-between px-4">
-            <h1 className="text-lg md:text-xl font-bold text-primary">Stylus IDE</h1>
-            
-            <div className="flex items-center gap-2">
-              {/* Compile Button */}
-              <Button
-                onClick={handleCompile}
-                disabled={isCompiling}
-                size="sm"
-                className="hidden sm:flex"
-                variant={compilationStatus === 'success' ? 'default' : 'default'}
-              >
-                <Play className="h-4 w-4 mr-2" />
-                {isCompiling ? 'Compiling...' : 'Compile'}
-              </Button>
-  
-              {/* Export ABI Button */}
-              <Button
-                onClick={handleExportABI}
-                disabled={isExportingABI || !sessionId || compilationStatus !== 'success'}
-                size="sm"
-                variant="outline"
-                className="hidden sm:flex"
-              >
-                <Download className="h-4 w-4 mr-2" />
-                {isExportingABI ? 'Exporting...' : 'Export ABI'}
-              </Button>
-  
-              {/* Templates Dropdown */}
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="outline" size="sm" className="hidden sm:flex">
-                    <FileCode className="h-4 w-4 mr-2" />
-                    Templates
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  {templates.map((template) => (
-                    <DropdownMenuItem
-                      key={template.id}
-                      onClick={() => handleLoadTemplate(template.id)}
-                    >
-                      <div>
-                        <div className="font-medium">{template.name}</div>
-                        <div className="text-xs text-muted-foreground">
-                          {template.description}
-                        </div>
-                      </div>
-                    </DropdownMenuItem>
-                  ))}
-                </DropdownMenuContent>
-              </DropdownMenu>
-  
-              {/* Mobile AI Toggle */}
-              <Button
-                variant="ghost"
-                size="icon"
-                className="lg:hidden"
-                onClick={() => setShowAIPanel(!showAIPanel)}
-              >
-                <Bot className="h-5 w-5" />
-              </Button>
-            </div>
-          </header>
+    <>
+      <SetupGuide />
+      <ABIDialog
+        open={showABIDialog}
+        onOpenChange={setShowABIDialog}
+        abi={abiData.abi}
+        solidity={abiData.solidity}
+      />
+      <DeployDialog
+        open={showDeployDialog}
+        onOpenChange={setShowDeployDialog}
+        sessionId={sessionId}
+        onDeploySuccess={handleDeploySuccess}
+      />
+      
+      <main className="h-screen flex flex-col bg-background">
+        {/* Header */}
+        <header className="h-14 border-b border-border flex items-center justify-between px-4">
+          <h1 className="text-lg md:text-xl font-bold text-primary">Stylus IDE</h1>
+          
+          <div className="flex items-center gap-2">
+            {/* Connect Wallet */}
+            <ConnectButton />
 
-        {/* Main Content */}
+            {/* Compile Button */}
+            <Button
+              onClick={handleCompile}
+              disabled={isCompiling}
+              size="sm"
+              className="hidden sm:flex"
+            >
+              <Play className="h-4 w-4 mr-2" />
+              {isCompiling ? 'Compiling...' : 'Compile'}
+            </Button>
+
+            {/* Export ABI Button */}
+            <Button
+              onClick={handleExportABI}
+              disabled={isExportingABI || !sessionId || compilationStatus !== 'success'}
+              size="sm"
+              variant="outline"
+              className="hidden sm:flex"
+            >
+              <Download className="h-4 w-4 mr-2" />
+              {isExportingABI ? 'Exporting...' : 'Export ABI'}
+            </Button>
+
+            <Button
+              onClick={() => setShowDeployDialog(true)}
+              disabled={!isConnected || !sessionId || compilationStatus !== 'success'}
+              size="sm"
+              className="hidden sm:flex"
+            >
+              <Upload className="h-4 w-4 mr-2" />
+              Deploy
+            </Button>
+
+            {/* Templates Dropdown */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm" className="hidden md:flex">
+                  <FileCode className="h-4 w-4 mr-2" />
+                  Templates
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                {templates.map((template) => (
+                  <DropdownMenuItem
+                    key={template.id}
+                    onClick={() => handleLoadTemplate(template.id)}
+                  >
+                    <div>
+                      <div className="font-medium">{template.name}</div>
+                      <div className="text-xs text-muted-foreground">
+                        {template.description}
+                      </div>
+                    </div>
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            {/* Mobile AI Toggle */}
+            <Button
+              variant="ghost"
+              size="icon"
+              className="lg:hidden"
+              onClick={() => setShowAIPanel(!showAIPanel)}
+            >
+              <Bot className="h-5 w-5" />
+            </Button>
+          </div>
+        </header>
+
+        {/* Main Content - Same as before */}
         <div className="flex-1 flex overflow-hidden relative">
           {/* Editor Area */}
           <section className="flex-1 flex flex-col min-w-0">
-            {/* Editor Toolbar */}
             <div className="h-12 border-b border-border flex items-center justify-between px-4 gap-2">
               <div className="flex items-center gap-2 overflow-x-auto">
                 <span className="text-sm text-muted-foreground whitespace-nowrap">
@@ -241,7 +282,6 @@ export default function HomePage() {
                 )}
               </div>
 
-              {/* Mobile Compile Button */}
               <Button
                 onClick={handleCompile}
                 disabled={isCompiling}
@@ -252,7 +292,6 @@ export default function HomePage() {
               </Button>
             </div>
 
-            {/* Monaco Editor */}
             <div className="flex-1 bg-card min-h-0">
               <MonacoEditor
                 value={code}
@@ -286,11 +325,10 @@ export default function HomePage() {
             </div>
             
             <div className="h-full flex items-center justify-center text-muted-foreground text-sm">
-              AI Assistant (Coming Soon)
+              AI Assistant (Coming in Phase 3)
             </div>
           </aside>
 
-          {/* Backdrop */}
           {showAIPanel && (
             <div
               className="fixed inset-0 bg-background/80 backdrop-blur-sm z-30 lg:hidden"
