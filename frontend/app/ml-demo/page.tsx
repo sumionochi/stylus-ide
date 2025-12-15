@@ -308,22 +308,25 @@ export default function MLDemoPage() {
               </div>
 
               {/* Test Samples */}
-              <div className="space-y-2">
-                <p className="text-sm text-muted-foreground">Or load a test sample:</p>
+                <div className="space-y-2">
+                <p className="text-sm text-muted-foreground">Load correctly classified test samples:</p>
                 <div className="grid grid-cols-5 gap-2">
-                  {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map((i) => (
+                    {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map((i) => (
                     <Button
-                      key={i}
-                      variant="outline"
-                      size="sm"
-                      onClick={() => loadTestSample(i)}
-                      className="h-10"
+                        key={i}
+                        variant="outline"
+                        size="sm"
+                        onClick={() => loadTestSample(i)}
+                        className="h-10"
                     >
-                      #{i}
+                        Digit {i}
                     </Button>
-                  ))}
+                    ))}
                 </div>
-              </div>
+                <p className="text-xs text-muted-foreground">
+                    These are real MNIST images that the model classifies correctly
+                </p>
+                </div>
             </CardContent>
           </Card>
 
