@@ -2,7 +2,9 @@
 
 import Editor, { Monaco } from '@monaco-editor/react';
 import { useEffect, useRef, useState } from 'react';
-import type { editor, languages } from 'monaco-editor';
+import type { editor, languages, IDisposable } from 'monaco-editor';
+import { AICompletionPopup } from '../ai/AICompletionPopup';
+import { useAICompletion } from '@/hooks/useAICompletion';
 
 interface MonacoEditorProps {
   value: string;
@@ -24,17 +26,35 @@ export function MonacoEditor({
   const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
   const monacoRef = useRef<Monaco | null>(null);
 
-  // ✅ don’t read window during render
+  const [showCompletion, setShowCompletion] = useState(false);
+  const [completionPosition, setCompletionPosition] = useState({ top: 0, left: 0 });
+
+  const { isLoading, completion, generateCompletion, clearCompletion } = useAICompletion();
+
+  // ✅ SSR-safe minimap enablement
   const [minimapEnabled, setMinimapEnabled] = useState(false);
 
-  // avoid duplicate provider registrations (StrictMode double-mount in dev)
-  const completionRegisteredRef = useRef(false);
+  // (optional but nice) avoid provider leaks / duplicates across unmounts
+  const completionProviderDisposableRef = useRef<IDisposable | null>(null);
 
   useEffect(() => {
     const update = () => setMinimapEnabled(window.innerWidth > 768);
     update();
     window.addEventListener('resize', update);
     return () => window.removeEventListener('resize', update);
+  }, []);
+
+  // keep minimap synced after mount + on resize changes
+  useEffect(() => {
+    editorRef.current?.updateOptions({ minimap: { enabled: minimapEnabled } });
+  }, [minimapEnabled]);
+
+  // cleanup any registered provider on unmount (prevents StrictMode duplicates)
+  useEffect(() => {
+    return () => {
+      completionProviderDisposableRef.current?.dispose?.();
+      completionProviderDisposableRef.current = null;
+    };
   }, []);
 
   // Apply error markers when errors change
@@ -46,8 +66,8 @@ export function MonacoEditor({
     const model = ed.getModel();
     if (!model) return;
 
-    // Clear existing markers
-    monaco.editor.setModelMarkers(model, 'rust', []);
+    const owner = 'stylus-errors';
+    monaco.editor.setModelMarkers(model, owner, []);
 
     if (errors.length > 0) {
       const markers: editor.IMarkerData[] = errors.map((error) => ({
@@ -57,24 +77,42 @@ export function MonacoEditor({
         endLineNumber: error.line,
         endColumn: Math.max(error.column + 1, error.column + 10),
         message: error.message,
-        source: 'rust',
+        source: language,
       }));
 
-      monaco.editor.setModelMarkers(model, 'rust', markers);
+      monaco.editor.setModelMarkers(model, owner, markers);
     }
-  }, [errors]);
+  }, [errors, language]);
+
+  // Handle keyboard shortcuts for completion
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Escape to close
+      if (e.key === 'Escape' && showCompletion) {
+        setShowCompletion(false);
+        clearCompletion();
+      }
+
+      // Tab to accept
+      if (e.key === 'Tab' && showCompletion && completion) {
+        e.preventDefault();
+        handleAcceptCompletion(completion);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [showCompletion, completion, clearCompletion]);
 
   function handleEditorDidMount(ed: editor.IStandaloneCodeEditor, monaco: Monaco) {
     editorRef.current = ed;
     monacoRef.current = monaco;
 
-    // keep minimap in sync after mount too
+    // ✅ ensure minimap is correct immediately after mount
     ed.updateOptions({ minimap: { enabled: minimapEnabled } });
 
-    // Register Stylus-specific snippets (once)
-    if (!completionRegisteredRef.current) {
-      completionRegisteredRef.current = true;
-
+    // Register Stylus-specific snippets (and avoid duplicates)
+    if (!completionProviderDisposableRef.current) {
       const provider: languages.CompletionItemProvider = {
         provideCompletionItems: (model, position) => {
           const word = model.getWordUntilPosition(position);
@@ -118,23 +156,27 @@ export function MonacoEditor({
               documentation: 'Stylus public implementation',
               range,
             },
-            {
-              label: 'entrypoint',
-              kind: monaco.languages.CompletionItemKind.Snippet,
-              insertText: '#[entrypoint]',
-              documentation: 'Mark struct as contract entrypoint',
-              range,
-            },
           ];
 
           return { suggestions };
         },
       };
 
-      monaco.languages.registerCompletionItemProvider('rust', provider);
+      completionProviderDisposableRef.current =
+        monaco.languages.registerCompletionItemProvider('rust', provider);
     }
 
-    // Keyboard shortcut Cmd/Ctrl+S
+    // AI Completion - Ctrl/Cmd + K
+    ed.addAction({
+      id: 'ai-complete',
+      label: 'AI Complete',
+      keybindings: [monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyK],
+      run: () => {
+        handleAIComplete();
+      },
+    });
+
+    // Compile - Ctrl/Cmd + S
     ed.addAction({
       id: 'compile-contract',
       label: 'Compile Contract',
@@ -145,41 +187,120 @@ export function MonacoEditor({
     ed.focus();
   }
 
-  // when minimapEnabled changes, update editor options (after mount)
-  useEffect(() => {
-    editorRef.current?.updateOptions({ minimap: { enabled: minimapEnabled } });
-  }, [minimapEnabled]);
-
   function handleEditorChange(newValue: string | undefined) {
-    onChange(newValue ?? '');
+    onChange(newValue || '');
+  }
+
+  async function handleAIComplete() {
+    if (!editorRef.current) return;
+
+    const position = editorRef.current.getPosition();
+    if (!position) return;
+
+    const model = editorRef.current.getModel();
+    if (!model) return;
+
+    // Get current line text
+    const lineContent = model.getLineContent(position.lineNumber);
+    const currentLineText = lineContent.substring(0, position.column - 1);
+
+    // Get context (previous 20 lines)
+    const startLine = Math.max(1, position.lineNumber - 20);
+    const contextRange = {
+      startLineNumber: startLine,
+      startColumn: 1,
+      endLineNumber: position.lineNumber,
+      endColumn: position.column,
+    };
+    const context = model.getValueInRange(contextRange);
+
+    // Calculate popup position
+    const coords = editorRef.current.getScrolledVisiblePosition(position);
+    if (coords) {
+      const editorDom = editorRef.current.getDomNode();
+      if (editorDom) {
+        const rect = editorDom.getBoundingClientRect();
+        setCompletionPosition({
+          top: rect.top + coords.top + coords.height + 5,
+          left: rect.left + coords.left,
+        });
+      }
+    }
+
+    setShowCompletion(true);
+    await generateCompletion(currentLineText, context);
+  }
+
+  function handleAcceptCompletion(completionText: string) {
+    if (!editorRef.current) return;
+
+    const position = editorRef.current.getPosition();
+    if (!position) return;
+
+    // Insert completion at current position
+    const range = {
+      startLineNumber: position.lineNumber,
+      startColumn: position.column,
+      endLineNumber: position.lineNumber,
+      endColumn: position.column,
+    };
+
+    editorRef.current.executeEdits('ai-completion', [
+      {
+        range,
+        text: completionText,
+        forceMoveMarkers: true,
+      },
+    ]);
+
+    setShowCompletion(false);
+    clearCompletion();
+    editorRef.current.focus();
+  }
+
+  function handleRejectCompletion() {
+    setShowCompletion(false);
+    clearCompletion();
+    editorRef.current?.focus();
   }
 
   return (
-    <Editor
-      height="100%"
-      defaultLanguage={language}
-      language={language}
-      value={value}
-      onChange={handleEditorChange}
-      onMount={handleEditorDidMount}
-      theme="vs-dark"
-      options={{
-        readOnly,
-        fontSize: 14,
-        fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
-        minimap: { enabled: minimapEnabled }, // ✅ no window here
-        scrollBeyondLastLine: false,
-        automaticLayout: true,
-        tabSize: 4,
-        formatOnPaste: true,
-        formatOnType: true,
-        rulers: [80, 100],
-        wordWrap: 'on',
-        lineNumbers: 'on',
-        glyphMargin: true,
-        folding: true,
-        bracketPairColorization: { enabled: true },
-      }}
-    />
+    <>
+      <Editor
+        height="100%"
+        defaultLanguage={language}
+        language={language}
+        value={value}
+        onChange={handleEditorChange}
+        onMount={handleEditorDidMount}
+        theme="vs-dark"
+        options={{
+          readOnly,
+          fontSize: 14,
+          fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
+          minimap: { enabled: minimapEnabled }, // ✅ no window here
+          scrollBeyondLastLine: false,
+          automaticLayout: true,
+          tabSize: 4,
+          formatOnPaste: true,
+          formatOnType: true,
+          rulers: [80, 100],
+          wordWrap: 'on',
+          lineNumbers: 'on',
+          glyphMargin: true,
+          folding: true,
+          bracketPairColorization: { enabled: true },
+        }}
+      />
+
+      <AICompletionPopup
+        visible={showCompletion}
+        position={completionPosition}
+        onAccept={handleAcceptCompletion}
+        onReject={handleRejectCompletion}
+        isLoading={isLoading}
+        completion={completion}
+      />
+    </>
   );
 }
