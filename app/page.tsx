@@ -23,6 +23,7 @@ import { ContractInteraction } from '@/components/interact/ContractInteraction';
 import { FaucetButton } from '@/components/wallet/FaucetButton';
 import { useFileTabs } from '@/hooks/useFileTabs';
 import { FileTabs } from '@/components/editor/FileTabs';
+import { ChatPanel } from '@/components/ai/ChatPanel';
 
 const DEFAULT_CODE = `// Welcome to Stylus IDE
 #![cfg_attr(not(feature = "export-abi"), no_main)]
@@ -390,9 +391,15 @@ export default function HomePage() {
                   abi={abiData.abi}
                 />
               ) : (
-                <div className="h-full flex items-center justify-center text-muted-foreground text-sm">
-                  AI Assistant (Coming in Phase 3)
-                </div>
+                <ChatPanel
+                  currentCode={activeTab?.content}
+                  compilationErrors={errors}
+                  onInsertCode={(code) => {
+                    if (activeTab) {
+                      updateTabContent(activeTab.id, code);
+                    }
+                  }}
+                />
               )}
             </div>
           </aside>
