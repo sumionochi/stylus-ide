@@ -12,18 +12,23 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { arbitrum, arbitrumSepolia } from 'wagmi/chains';
+import { xaiSepolia, rariTestnet, sankoTestnet, isOrbitChain } from '@/lib/orbit-chains';
 
 export function ConnectButton() {
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
 
-  const { address, isConnected } = useAccount();
+  const { address, isConnected, chain } = useAccount();
   const { connect, connectors } = useConnect();
   const { disconnect } = useDisconnect();
   const chainId = useChainId();
   const { switchChain } = useSwitchChain();
 
-  const supportedChains = useMemo(() => [arbitrumSepolia, arbitrum], []);
+  const supportedChains = useMemo(() => [arbitrumSepolia, 
+    arbitrum,
+    xaiSepolia,
+    rariTestnet,
+    sankoTestnet,], []);
   const activeChain = supportedChains.find((c) => c.id === chainId);
   const isWrongNetwork = isConnected && !activeChain;
 
@@ -93,18 +98,43 @@ export function ConnectButton() {
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button variant="outline" size="sm" className="hidden sm:flex">
-            {activeChain?.name ?? 'Unknown : Add Chain'}
+            {chain?.name || 'Unknown'}
+            {chain && isOrbitChain(chain.id) && (
+              <span className="ml-1.5 text-xs bg-primary/20 text-primary px-1.5 py-0.5 rounded">
+                Orbit
+              </span>
+            )}
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
-          {supportedChains.map((c) => (
+          <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">
+            Arbitrum Networks
+          </div>
+          <DropdownMenuSeparator />
+          {supportedChains.filter(c => !isOrbitChain(c.id)).map((supportedChain) => (
             <DropdownMenuItem
-              key={c.id}
-              onClick={() => switchChain({ chainId: c.id })}
-              disabled={chainId === c.id}
+              key={supportedChain.id}
+              onClick={() => switchChain({ chainId: supportedChain.id })}
+              disabled={chainId === supportedChain.id}
             >
-              {c.name}
-              {chainId === c.id && ' ✓'}
+              {supportedChain.name}
+              {chainId === supportedChain.id && ' ✓'}
+            </DropdownMenuItem>
+          ))}
+          
+          <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground mt-2">
+            Orbit Chains
+          </div>
+          <DropdownMenuSeparator />
+          {supportedChains.filter(c => isOrbitChain(c.id)).map((supportedChain) => (
+            <DropdownMenuItem
+              key={supportedChain.id}
+              onClick={() => switchChain({ chainId: supportedChain.id })}
+              disabled={chainId === supportedChain.id}
+              className="text-xs"
+            >
+              {supportedChain.name}
+              {chainId === supportedChain.id && ' ✓'}
             </DropdownMenuItem>
           ))}
         </DropdownMenuContent>
