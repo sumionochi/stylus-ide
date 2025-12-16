@@ -96,7 +96,7 @@ export function FaucetButton() {
         </Button>
       </DropdownMenuTrigger>
 
-      <DropdownMenuContent align="end" className="w-80">
+      <DropdownMenuContent align="end" className="w-80 max-h-96 overflow-y-auto custom-scrollbar">
         <DropdownMenuLabel className="flex items-center gap-2">
           <Droplet className="h-4 w-4" />
           Get Free Testnet ETH

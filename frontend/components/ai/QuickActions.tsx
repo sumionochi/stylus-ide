@@ -1,12 +1,12 @@
 'use client';
 
 import { Button } from '@/components/ui/button';
-import { 
-  Wand2, 
-  Bug, 
-  Zap, 
-  Code2, 
-  FileCode, 
+import {
+  Wand2,
+  Bug,
+  Zap,
+  Code2,
+  FileCode,
   ArrowRightLeft,
   HelpCircle,
   Lightbulb
@@ -90,15 +90,15 @@ interface QuickActionsProps {
 export function QuickActions({ onActionClick, hasCode, hasErrors }: QuickActionsProps) {
   return (
     <div className="space-y-3">
-      <div className="px-4 pt-4">
+      <div className="px-2 sm:px-4">
         <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
           Quick Actions
         </h3>
       </div>
-      
-      <div className="grid grid-cols-2 gap-2 px-4">
+
+      <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-2 gap-1.5 sm:gap-2 px-2 sm:px-4">
         {quickActions.map((action) => {
-          const isDisabled = 
+          const isDisabled =
             (action.requiresCode && !hasCode) ||
             (action.requiresErrors && !hasErrors);
 
@@ -109,10 +109,12 @@ export function QuickActions({ onActionClick, hasCode, hasErrors }: QuickActions
               size="sm"
               onClick={() => onActionClick(action)}
               disabled={isDisabled}
-              className="h-auto py-3 flex flex-col items-center gap-1.5 hover:bg-primary/10"
+              className="h-auto py-2 sm:py-3 flex flex-col items-center gap-1 sm:gap-1.5 hover:bg-primary/10 transition-colors"
             >
-              {action.icon}
-              <span className="text-xs leading-tight text-center">
+              <div className="flex-shrink-0">
+                {action.icon}
+              </div>
+              <span className="text-xs leading-tight text-center break-words hyphens-auto">
                 {action.label}
               </span>
             </Button>

@@ -24,6 +24,10 @@ import { FaucetButton } from '@/components/wallet/FaucetButton';
 import { useFileTabs } from '@/hooks/useFileTabs';
 import { FileTabs } from '@/components/editor/FileTabs';
 import { ChatPanel } from '@/components/ai/ChatPanel';
+import { usePanelState } from '@/hooks/usePanelState';
+import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
+import { useResponsive } from '@/hooks/useResponsive';
+import { KeyboardShortcutHint } from '@/components/ui/KeyboardShortcutHint';
 import Link from 'next/link';
 
 const DEFAULT_CODE = `// Welcome to Stylus IDE
@@ -53,8 +57,8 @@ impl MyContract {
 `;
 
 export default function HomePage() {
-  const [showAIPanel, setShowAIPanel] = useState(false);
-  const [showOutput, setShowOutput] = useState(true);
+  const { showAIPanel, showOutput, isAIPanelCollapsed, setShowAIPanel, setShowOutput, toggleAIPanel, toggleOutput, toggleAIPanelCollapse } = usePanelState();
+  const { isMobile, isDesktop } = useResponsive();
   const {
     tabs,
     activeTabId,
@@ -63,6 +67,7 @@ export default function HomePage() {
     removeTab,
     updateTabContent,
     setActiveTab,
+    renameTab,
     getTabsCode,
   } = useFileTabs(DEFAULT_CODE);
   const [showABIDialog, setShowABIDialog] = useState(false);
@@ -78,20 +83,30 @@ export default function HomePage() {
   }>>([]);
 
   const { isConnected } = useAccount();
-  
+
   const { isCompiling, output, errors, compilationTime, sessionId, compile, clearOutput } = useCompilation();
 
   const handleCompile = async () => {
     // Compile the active tab's code
     if (!activeTab) return;
     await compile(activeTab.content, true);
-    setShowOutput(true);
+    // Show output panel after compilation, but respect mobile layout
+    if (isDesktop || !showAIPanel) {
+      setShowOutput(true);
+    }
   };
-  
+
   const handleSave = () => {
     handleCompile();
   };
-  
+
+  // Keyboard shortcuts
+  useKeyboardShortcuts({
+    onToggleAI: toggleAIPanel,
+    onToggleOutput: toggleOutput,
+    onCompile: handleCompile,
+  });
+
   const handleLoadTemplate = (templateId: string) => {
     const template = getTemplate(templateId);
     if (template) {
@@ -102,23 +117,23 @@ export default function HomePage() {
       clearOutput();
     }
   };
-  
+
   const handleNewFile = (type: 'rust' | 'toml' | 'markdown') => {
     const extensions = {
       rust: '.rs',
       toml: '.toml',
       markdown: '.md',
     };
-    
+
     const languages = {
       rust: 'rust',
       toml: 'toml',
       markdown: 'markdown',
     };
-  
+
     const count = tabs.filter((t) => t.name.includes(extensions[type])).length;
     const name = `new_file_${count + 1}${extensions[type]}`;
-    
+
     addTab(name, '', languages[type]);
   };
 
@@ -159,10 +174,10 @@ export default function HomePage() {
             'Then try exporting again.'
           );
         } else {
-          const errorMsg = result.details 
+          const errorMsg = result.details
             ? `${result.error}\n\nDetails:\n${result.details}`
             : result.error || 'Unknown error';
-          
+
           console.error('ABI Export Error:', errorMsg);
           alert(`ABI export failed:\n${errorMsg}`);
         }
@@ -205,10 +220,10 @@ export default function HomePage() {
   const compilationStatus = isCompiling
     ? 'compiling'
     : output.some((o) => o.type === 'complete' && o.data.includes('successful'))
-    ? 'success'
-    : output.some((o) => o.type === 'error' || o.type === 'complete')
-    ? 'error'
-    : 'idle';
+      ? 'success'
+      : output.some((o) => o.type === 'error' || o.type === 'complete')
+        ? 'error'
+        : 'idle';
 
   return (
     <>
@@ -225,12 +240,12 @@ export default function HomePage() {
         sessionId={sessionId}
         onDeploySuccess={handleDeploySuccess}
       />
-      
+
       <main className="h-screen flex flex-col bg-background">
         {/* Header */}
         <header className="h-14 border-b border-border flex items-center justify-between px-4">
           <h1 className="text-lg md:text-xl font-bold text-primary">Stylus IDE</h1>
-          
+
           <div className="flex items-center gap-2">
             {/* Connect Wallet */}
             <ConnectButton />
@@ -303,97 +318,234 @@ export default function HomePage() {
               </DropdownMenuContent>
             </DropdownMenu>
 
-            {/* Mobile AI Toggle */}
+            {/* AI Panel Toggle - Mobile and Desktop */}
             <Button
               variant="ghost"
               size="icon"
-              className="lg:hidden"
-              onClick={() => setShowAIPanel(!showAIPanel)}
+              className="focus-visible-ring"
+              onClick={() => {
+                if (isMobile) {
+                  toggleAIPanel();
+                } else {
+                  toggleAIPanelCollapse();
+                }
+              }}
+              aria-label={
+                isMobile
+                  ? (showAIPanel ? 'Close AI assistant (Esc)' : 'Open AI assistant (Cmd+K)')
+                  : (isAIPanelCollapsed ? 'Show AI assistant' : 'Hide AI assistant')
+              }
+              title={
+                isMobile
+                  ? (showAIPanel ? 'Close AI assistant (Esc)' : 'Open AI assistant (Cmd+K)')
+                  : (isAIPanelCollapsed ? 'Show AI assistant' : 'Hide AI assistant')
+              }
             >
               <Bot className="h-5 w-5" />
             </Button>
           </div>
         </header>
 
-        {/* Main Content - Same as before */}
-        <div className="flex-1 flex overflow-hidden relative">
-          {/* Editor Area */}
-          <section className="flex-1 flex flex-col min-w-0">
-            {/* File Tabs */}
-            <FileTabs
-              tabs={tabs}
-              activeTabId={activeTabId}
-              onTabClick={setActiveTab}
-              onTabClose={removeTab}
-              onNewFile={handleNewFile}
-            />
+        {/* Main Content Area with Responsive Layout */}
+        <div className="flex-1 flex flex-col lg:flex-row overflow-hidden">
+          {/* Primary Content Area */}
+          <div className="flex-1 flex flex-col min-w-0 relative">
+            {/* Editor Section */}
+            <section className="flex-1 flex flex-col min-h-0">
+              {/* File Tabs */}
+              <FileTabs
+                tabs={tabs}
+                activeTabId={activeTabId}
+                onTabClick={setActiveTab}
+                onTabClose={removeTab}
+                onNewFile={handleNewFile}
+                onRenameTab={renameTab}
+              />
 
-            {/* Active Tab Toolbar */}
-            <div className="h-10 border-b border-border flex items-center justify-between px-4 gap-2">
-              <div className="flex items-center gap-2 overflow-x-auto">
-                <span className="text-xs text-muted-foreground">
-                  {tabs.length} file{tabs.length !== 1 ? 's' : ''}
-                </span>
-                {errors.length > 0 && (
-                  <span className="text-xs bg-red-500/20 text-red-400 px-2 py-0.5 rounded-full">
-                    {errors.length} {errors.length === 1 ? 'error' : 'errors'}
+              {/* Active Tab Toolbar */}
+              <div className="h-10 border-b border-border flex items-center justify-between px-4 gap-2">
+                <div className="flex items-center gap-2 overflow-x-auto">
+                  <span className="text-xs text-muted-foreground">
+                    {tabs.length} file{tabs.length !== 1 ? 's' : ''}
                   </span>
-                )}
+                  {errors.length > 0 && (
+                    <span className="text-xs bg-red-500/20 text-red-400 px-2 py-0.5 rounded-full">
+                      {errors.length} {errors.length === 1 ? 'error' : 'errors'}
+                    </span>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <Button
+                    onClick={handleCompile}
+                    disabled={isCompiling || !activeTab}
+                    size="sm"
+                    className="sm:hidden h-7"
+                  >
+                    <Play className="h-3 w-3" />
+                  </Button>
+
+                  {/* Mobile Output Toggle */}
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="sm:hidden h-7"
+                    onClick={toggleOutput}
+                    aria-label={showOutput ? 'Hide output panel' : 'Show output panel'}
+                  >
+                    Output {showOutput ? '−' : '+'}
+                  </Button>
+                </div>
               </div>
 
-              <Button
-                onClick={handleCompile}
-                disabled={isCompiling || !activeTab}
-                size="sm"
-                className="sm:hidden h-7"
-              >
-                <Play className="h-3 w-3" />
-              </Button>
-            </div>
+              {/* Monaco Editor */}
+              <div className={`flex-1 bg-card transition-all duration-300 ${showOutput ? 'min-h-0' : 'min-h-0'
+                }`}>
+                {activeTab ? (
+                  <MonacoEditor
+                    key={activeTab.id}
+                    value={activeTab.content}
+                    onChange={(value) => updateTabContent(activeTab.id, value)}
+                    onSave={handleSave}
+                    readOnly={isCompiling}
+                    errors={errors}
+                  />
+                ) : (
+                  <div className="h-full flex items-center justify-center text-muted-foreground">
+                    No file open
+                  </div>
+                )}
+              </div>
+            </section>
 
-            {/* Monaco Editor */}
-            <div className="flex-1 bg-card min-h-0">
-              {activeTab ? (
-                <MonacoEditor
-                  key={activeTab.id} // Force re-render on tab change
-                  value={activeTab.content}
-                  onChange={(value) => updateTabContent(activeTab.id, value)}
-                  onSave={handleSave}
-                  readOnly={isCompiling}
-                  errors={errors}
-                />
-              ) : (
-                <div className="h-full flex items-center justify-center text-muted-foreground">
-                  No file open
+            {/* Bottom Panel - Output (Responsive) */}
+            <section
+              className={`
+                border-t border-border flex flex-col bg-card
+                transition-all duration-300 ease-in-out
+                ${showOutput
+                  ? 'h-32 sm:h-40 md:h-48 lg:h-56 xl:h-64'
+                  : 'h-10 sm:h-12'
+                }
+              `}
+            >
+              <div className={`${showOutput ? 'h-10 sm:h-12' : 'h-10 sm:h-12'} border-b border-border flex items-center justify-between px-4`}>
+                <div className="flex items-center gap-2 sm:gap-3 overflow-x-auto">
+                  <button
+                    className="text-sm font-medium cursor-pointer flex items-center gap-2 hover:text-primary transition-colors"
+                    onClick={toggleOutput}
+                    aria-label={showOutput ? 'Hide output panel' : 'Show output panel'}
+                  >
+                    <span className="hidden sm:inline">Output</span>
+                    <span className="sm:hidden">Out</span>
+                    {compilationStatus === 'success' && (
+                      <CheckCircle2 className="h-4 w-4 text-green-400" />
+                    )}
+                    {compilationStatus === 'error' && (
+                      <XCircle className="h-4 w-4 text-red-400" />
+                    )}
+                  </button>
+
+                  {output.length > 0 && (
+                    <span className="text-xs bg-primary/20 text-primary px-2 py-0.5 rounded-full">
+                      {output.length}
+                    </span>
+                  )}
+
+                  {compilationTime !== null && (
+                    <span className="hidden sm:flex text-xs text-muted-foreground items-center gap-1">
+                      <Clock className="h-3 w-3" />
+                      {formatCompilationTime(compilationTime)}
+                    </span>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-1 sm:gap-2">
+                  {output.length > 0 && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={clearOutput}
+                      className="h-7 sm:h-8 px-2 sm:px-3"
+                      aria-label="Clear output"
+                    >
+                      <Trash2 className="h-3 w-3 sm:mr-1" />
+                      <span className="hidden sm:inline">Clear</span>
+                    </Button>
+                  )}
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={toggleOutput}
+                    className="h-7 sm:h-8 px-2"
+                    aria-label={showOutput ? 'Collapse output' : 'Expand output'}
+                  >
+                    {showOutput ? '−' : '+'}
+                  </Button>
+                </div>
+              </div>
+
+              {showOutput && (
+                <div className="flex-1 overflow-auto p-2 sm:p-4 min-h-0 font-mono text-xs space-y-1 custom-scrollbar">
+                  {output.length === 0 && !isCompiling && (
+                    <p className="text-muted-foreground">
+                      Ready to compile. Press Compile or Cmd/Ctrl+S
+                    </p>
+                  )}
+                  {isCompiling && output.length === 0 && (
+                    <p className="text-blue-400 animate-pulse">
+                      Starting compilation...
+                    </p>
+                  )}
+                  {output.map((item, index) => (
+                    <div
+                      key={index}
+                      className={`flex items-start gap-2 ${getOutputColor(item.type)}`}
+                    >
+                      {getOutputIcon(item.type)}
+                      <span className="flex-1 whitespace-pre-wrap break-anywhere">
+                        {stripAnsiCodes(item.data)}
+                      </span>
+                    </div>
+                  ))}
                 </div>
               )}
-            </div>
-          </section>
+            </section>
+          </div>
 
-          {/* Right Sidebar - AI Panel / Contract Interaction */}
+          {/* Right Sidebar - AI Panel / Contract Interaction (Improved Responsive) */}
           <aside
             className={`
-              fixed lg:relative inset-y-0 right-0 z-40
-              w-full sm:w-96 lg:w-96
+              transition-all duration-300 ease-in-out
+              ${showAIPanel
+                ? 'fixed inset-0 z-50 lg:relative lg:inset-auto lg:w-96 lg:max-w-[400px] lg:min-w-[320px]'
+                : 'hidden lg:block'
+              }
+              ${isAIPanelCollapsed
+                ? 'lg:w-0 lg:min-w-0 lg:max-w-0 lg:overflow-hidden'
+                : 'lg:w-96 lg:max-w-[400px] lg:min-w-[320px]'
+              }
               border-l border-border bg-card
-              transform transition-transform duration-300 ease-in-out
-              ${showAIPanel ? 'translate-x-0' : 'translate-x-full lg:translate-x-0'}
+              flex flex-col
             `}
           >
-            <div className="lg:hidden h-14 border-b border-border flex items-center justify-between px-4">
+            {/* Mobile Header */}
+            <div className="lg:hidden h-14 border-b border-border flex items-center justify-between px-4 bg-card/95 backdrop-blur-sm">
               <span className="font-semibold">
-                {deployedContracts.length > 0 ? 'Contract' : 'AI Assistant'}
+                {deployedContracts.length > 0 ? 'Contract Interaction' : 'AI Assistant'}
               </span>
               <Button
                 variant="ghost"
                 size="icon"
                 onClick={() => setShowAIPanel(false)}
+                aria-label="Close AI panel"
               >
                 <X className="h-5 w-5" />
               </Button>
             </div>
-            
-            <div className="h-full">
+
+            {/* Panel Content */}
+            <div className="flex-1 min-h-0 lg:h-full">
               {deployedContracts.length > 0 && abiData.abi ? (
                 <ContractInteraction
                   contractAddress={deployedContracts[deployedContracts.length - 1].address}
@@ -413,99 +565,18 @@ export default function HomePage() {
             </div>
           </aside>
 
+          {/* Mobile Overlay */}
           {showAIPanel && (
             <div
-              className="fixed inset-0 bg-background/80 backdrop-blur-sm z-30 lg:hidden"
+              className="fixed inset-0 bg-background/80 panel-overlay z-40 lg:hidden"
               onClick={() => setShowAIPanel(false)}
+              aria-label="Close AI panel"
             />
           )}
         </div>
 
-        {/* Bottom Panel - Output */}
-        <section
-          className={`
-            border-t border-border flex flex-col bg-card
-            transition-all duration-300
-            ${showOutput ? 'h-48 md:h-64' : 'h-12'}
-          `}
-        >
-          <div className="h-12 border-b border-border flex items-center justify-between px-4">
-            <div className="flex items-center gap-3">
-              <span
-                className="text-sm font-medium cursor-pointer flex items-center gap-2"
-                onClick={() => setShowOutput(!showOutput)}
-              >
-                Output
-                {compilationStatus === 'success' && (
-                  <CheckCircle2 className="h-4 w-4 text-green-400" />
-                )}
-                {compilationStatus === 'error' && (
-                  <XCircle className="h-4 w-4 text-red-400" />
-                )}
-              </span>
-              
-              {output.length > 0 && (
-                <span className="text-xs bg-primary/20 text-primary px-2 py-0.5 rounded-full">
-                  {output.length}
-                </span>
-              )}
-
-              {compilationTime !== null && (
-                <span className="text-xs text-muted-foreground flex items-center gap-1">
-                  <Clock className="h-3 w-3" />
-                  {formatCompilationTime(compilationTime)}
-                </span>
-              )}
-            </div>
-            
-            <div className="flex items-center gap-2">
-              {output.length > 0 && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={clearOutput}
-                  className="h-8"
-                >
-                  <Trash2 className="h-3 w-3 mr-1" />
-                  Clear
-                </Button>
-              )}
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setShowOutput(!showOutput)}
-              >
-                {showOutput ? '−' : '+'}
-              </Button>
-            </div>
-          </div>
-          
-          {showOutput && (
-            <div className="flex-1 overflow-auto p-4 min-h-0 font-mono text-xs space-y-1">
-              {output.length === 0 && !isCompiling && (
-                <p className="text-muted-foreground">
-                  Ready to compile. Press Compile or Cmd/Ctrl+S
-                </p>
-              )}
-              {isCompiling && output.length === 0 && (
-                <p className="text-blue-400 animate-pulse">
-                  Starting compilation...
-                </p>
-              )}
-              {output.map((item, index) => (
-                <div
-                  key={index}
-                  className={`flex items-start gap-2 ${getOutputColor(item.type)}`}
-                >
-                  {getOutputIcon(item.type)}
-                  <span className="flex-1 whitespace-pre-wrap wrap-break-words">
-                    {stripAnsiCodes(item.data)}
-                  </span>
-                </div>
-              ))}
-            </div>
-          )}
-        </section>
+        {/* Keyboard Shortcut Helper */}
+        <KeyboardShortcutHint />
       </main>
     </>
   );

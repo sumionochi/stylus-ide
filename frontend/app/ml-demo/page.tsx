@@ -10,10 +10,10 @@ import { ConnectButton } from '@/components/wallet/ConnectButton';
 import Link from 'next/link';
 
 const ML_CONTRACT_ABI = parseAbi([
-'function predict(uint8[] pixels) external view returns (uint256)',
-'function predictWithConfidence(uint8[] pixels) external view returns (uint256, uint256[])',
-'function getModelInfo() external view returns (uint256, uint256, uint256)',
-'function isReady() external view returns (bool)',
+  'function predict(uint8[] pixels) external view returns (uint256)',
+  'function predictWithConfidence(uint8[] pixels) external view returns (uint256, uint256[])',
+  'function getModelInfo() external view returns (uint256, uint256, uint256)',
+  'function isReady() external view returns (bool)',
 ]);
 
 export default function MLDemoPage() {
@@ -86,7 +86,7 @@ export default function MLDemoPage() {
 
     ctx.fillStyle = '#000000';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
-    
+
     setPrediction(null);
     setConfidence([]);
     setGasUsed(null);
@@ -101,7 +101,7 @@ export default function MLDemoPage() {
 
     // Get image data
     const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-    
+
     // Downsample to 28x28
     const downsampledData: number[] = [];
     const stepX = canvas.width / 28;
@@ -112,7 +112,7 @@ export default function MLDemoPage() {
         const x = Math.floor(j * stepX);
         const y = Math.floor(i * stepY);
         const idx = (y * canvas.width + x) * 4;
-        
+
         // Get grayscale value (using red channel since image is black/white)
         const value = imageData.data[idx];
         downsampledData.push(value);
@@ -124,14 +124,14 @@ export default function MLDemoPage() {
 
   const loadModelInfo = async () => {
     if (!publicClient || !contractAddress) return;
-  
+
     try {
       const info = await publicClient.readContract({
         address: contractAddress as Address,
         abi: ML_CONTRACT_ABI,
         functionName: 'getModelInfo', // Changed from 'get_model_info'
       });
-  
+
       setModelInfo({
         input: Number(info[0]),
         hidden: Number(info[1]),
@@ -141,19 +141,19 @@ export default function MLDemoPage() {
       console.error('Failed to load model info:', error);
     }
   };
-  
+
   const predictOnChain = async () => {
     if (!publicClient || !contractAddress) {
       alert('Please enter a deployed ML contract address');
       return;
     }
-  
+
     setIsProcessing(true);
     setGasUsed(null);
-  
+
     try {
       const pixels = getPixelData();
-  
+
       // Call predict function
       const result = await publicClient.readContract({
         address: contractAddress as Address,
@@ -161,9 +161,9 @@ export default function MLDemoPage() {
         functionName: 'predict',
         args: [pixels as any],
       });
-  
+
       setPrediction(Number(result));
-  
+
       // Try to get confidence scores
       try {
         const confResult = await publicClient.readContract({
@@ -172,14 +172,14 @@ export default function MLDemoPage() {
           functionName: 'predictWithConfidence', // Changed from 'predict_with_confidence'
           args: [pixels as any],
         });
-  
+
         const confidenceScores = (confResult[1] as bigint[]).map(n => Number(n));
         setConfidence(confidenceScores);
       } catch (err) {
         // Confidence function might not exist
         console.log('Confidence scores not available');
       }
-  
+
       // Estimate gas
       try {
         const gas = await publicClient.estimateContractGas({
@@ -189,12 +189,12 @@ export default function MLDemoPage() {
           args: [pixels as any],
           account: address,
         });
-  
+
         setGasUsed(gas.toString());
       } catch (err) {
         console.log('Could not estimate gas');
       }
-  
+
     } catch (error) {
       console.error('Prediction error:', error);
       alert('Prediction failed. Make sure the contract address is correct and deployed.');
@@ -207,7 +207,7 @@ export default function MLDemoPage() {
     try {
       const response = await fetch('/ml-weights/test_samples.json');
       const data = await response.json();
-      
+
       if (index >= data.images.length) return;
 
       const imageData = data.images[index];
@@ -232,7 +232,7 @@ export default function MLDemoPage() {
         for (let j = 0; j < 28; j++) {
           const pixelValue = imageData[i * 28 + j];
           const brightness = Math.floor(pixelValue * 255);
-          
+
           ctx.fillStyle = `rgb(${brightness}, ${brightness}, ${brightness})`;
           ctx.fillRect(j * cellWidth, i * cellHeight, cellWidth, cellHeight);
         }
@@ -249,10 +249,10 @@ export default function MLDemoPage() {
       alert('Please connect wallet and set contract address');
       return;
     }
-  
+
     setIsRunningBenchmark(true);
     const results: any = {};
-  
+
     try {
       // Get sample pixels
       const pixels = getPixelData();
@@ -262,7 +262,7 @@ export default function MLDemoPage() {
         const data = await response.json();
         pixels.push(...data.images[0].map((v: number) => Math.floor(v * 255)));
       }
-  
+
       // Benchmark predict()
       try {
         const gas = await publicClient.estimateContractGas({
@@ -276,7 +276,7 @@ export default function MLDemoPage() {
       } catch (e) {
         results.predict = 'Error';
       }
-  
+
       // Benchmark predictWithConfidence()
       try {
         const gas = await publicClient.estimateContractGas({
@@ -290,7 +290,7 @@ export default function MLDemoPage() {
       } catch (e) {
         results.predictWithConfidence = 'N/A';
       }
-  
+
       // Benchmark getModelInfo()
       try {
         const gas = await publicClient.estimateContractGas({
@@ -303,12 +303,12 @@ export default function MLDemoPage() {
       } catch (e) {
         results.getModelInfo = 'Error';
       }
-  
+
       setGasBenchmark({
         ...results,
         timestamp: Date.now(),
       });
-  
+
     } catch (error) {
       console.error('Benchmark error:', error);
       alert('Benchmark failed. Make sure contract is deployed and wallet is connected.');
@@ -316,7 +316,7 @@ export default function MLDemoPage() {
       setIsRunningBenchmark(false);
     }
   };
-  
+
   const calculateCost = (gasUsed: string, gweiPrice: number = 0.02) => {
     const gas = Number(gasUsed);
     const ethCost = (gas * gweiPrice) / 1e9;
@@ -397,25 +397,25 @@ export default function MLDemoPage() {
               </div>
 
               {/* Test Samples */}
-                <div className="space-y-2">
+              <div className="space-y-2">
                 <p className="text-sm text-muted-foreground">Load correctly classified test samples:</p>
                 <div className="grid grid-cols-5 gap-2">
-                    {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map((i) => (
+                  {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map((i) => (
                     <Button
-                        key={i}
-                        variant="outline"
-                        size="sm"
-                        onClick={() => loadTestSample(i)}
-                        className="h-10"
+                      key={i}
+                      variant="outline"
+                      size="sm"
+                      onClick={() => loadTestSample(i)}
+                      className="h-10"
                     >
-                        Digit {i}
+                      Digit {i}
                     </Button>
-                    ))}
+                  ))}
                 </div>
                 <p className="text-xs text-muted-foreground">
-                    These are real MNIST images that the model classifies correctly
+                  These are real MNIST images that the model classifies correctly
                 </p>
-                </div>
+              </div>
             </CardContent>
           </Card>
 
