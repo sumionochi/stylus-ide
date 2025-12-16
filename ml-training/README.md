@@ -17,7 +17,7 @@ python -m pip install numpy scikit-learn pandas
 ## Train Model
 
 ```bash
-python train_model.py
+python train_tiny_model.py
 ```
 
 This will:

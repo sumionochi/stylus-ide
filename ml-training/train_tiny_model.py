@@ -9,7 +9,7 @@ from sklearn.datasets import fetch_openml
 from sklearn.neural_network import MLPClassifier
 from sklearn.model_selection import train_test_split
 import json
-
+import re
 # TINY configuration for on-chain deployment
 HIDDEN_LAYER_SIZE = 10  # Very small to reduce weights
 INPUT_SIZE = 784
@@ -205,7 +205,75 @@ with open('../frontend/lib/ml-contract-template.txt', 'w') as f:
     f.write(contract_code)
 
 print(f"\n✓ Contract saved to: frontend/lib/ml-contract-template.txt")
-print(f"✓ Model achieves {test_score:.2%} accuracy")
+
+def escape_for_ts_template_literal(s: str) -> str:
+    # Safe for TypeScript template literals:
+    # - escape backslashes
+    # - escape backticks
+    # - prevent ${} interpolation
+    return s.replace('\\', '\\\\').replace('`', '\\`').replace('${', '\\${')
+
+def find_closing_backtick(text: str, start: int) -> int:
+    """
+    Find the next *unescaped* backtick in `text`, starting at `start`.
+    """
+    i = start
+    while i < len(text):
+        if text[i] == '`':
+            # count preceding backslashes
+            bs = 0
+            j = i - 1
+            while j >= start and text[j] == '\\':
+                bs += 1
+                j -= 1
+            if bs % 2 == 0:
+                return i
+        i += 1
+    return -1
+
+def update_template_code(templates_path: str, template_id: str, new_code: str) -> None:
+    src = open(templates_path, "r", encoding="utf-8").read()
+
+    # 1) Locate the template by id: "ml-inference"
+    m_id = re.search(rf'\bid\s*:\s*["\']{re.escape(template_id)}["\']', src)
+    if not m_id:
+        raise RuntimeError(f'Could not find template id "{template_id}" in {templates_path}')
+
+    # 2) From that point onward, locate: code: `
+    m_code = re.search(r'\bcode\s*:\s*`', src[m_id.end():])
+    if not m_code:
+        raise RuntimeError(f'Could not find `code: ` template literal for id "{template_id}"')
+
+    open_tick = m_id.end() + m_code.end() - 1  # index of the opening ` character
+
+    # 3) Find the matching closing backtick for that template literal
+    close_tick = find_closing_backtick(src, open_tick + 1)
+    if close_tick == -1:
+        raise RuntimeError(f'Could not find closing backtick for template id "{template_id}"')
+
+    # 4) Replace content between backticks
+    escaped = escape_for_ts_template_literal(new_code)
+    updated = src[:open_tick + 1] + escaped + src[close_tick:]
+
+    open(templates_path, "w", encoding="utf-8").write(updated)
+
+# --- AUTO-UPDATE templates.ts ---
+print("\nUpdating frontend/lib/templates.ts...")
+
+try:
+    templates_path = "../frontend/lib/templates.ts"  # your existing path is fine
+    update_template_code(templates_path, "ml-inference", contract_code)
+
+    print("✓ templates.ts updated successfully!")
+    print("✓ ML contract template now has real trained weights")
+    print("\n🎉 Training complete! Refresh your IDE to use the new model.")
+except Exception as e:
+    print(f"⚠️  Error updating templates.ts: {e}")
+    print("Please manually copy from ml-contract-template.txt")
+    import traceback
+    traceback.print_exc()
+
+print(f"\n✓ Model achieves {test_score:.2%} accuracy")
 print(f"✓ Total parameters: {w1.size + b1.size + w2.size + b2.size}")
 print(f"\nNote: Accuracy is lower due to tiny model size")
 print(f"Trade-off: {test_score:.0%} accuracy vs deployable on-chain")
