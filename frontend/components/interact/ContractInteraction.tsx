@@ -54,7 +54,7 @@ export function ContractInteraction({ contractAddress, abi }: ContractInteractio
     const values = inputValues[funcName] || [];
     return func.inputs.map((input, index) => {
       const value = values[index] || '';
-      
+
       // Convert based on type
       if (input.type.includes('uint') || input.type.includes('int')) {
         return value ? BigInt(value) : BigInt(0);
@@ -131,7 +131,7 @@ export function ContractInteraction({ contractAddress, abi }: ContractInteractio
       // Wait for transaction
       if (publicClient) {
         const receipt = await publicClient.waitForTransactionReceipt({ hash });
-        
+
         setResults((prev) => ({
           ...prev,
           [funcKey]: {
@@ -214,11 +214,10 @@ export function ContractInteraction({ contractAddress, abi }: ContractInteractio
 
           {result && (
             <div
-              className={`p-3 rounded-md text-xs ${
-                result.success
+              className={`p-3 rounded-md text-xs ${result.success
                   ? 'bg-green-500/10 border border-green-500/20'
                   : 'bg-red-500/10 border border-red-500/20'
-              }`}
+                }`}
             >
               {result.success ? (
                 <div className="space-y-1">
@@ -265,7 +264,7 @@ export function ContractInteraction({ contractAddress, abi }: ContractInteractio
 
   return (
     <div className="h-full flex flex-col">
-        <div className="p-4 border-b border-border space-y-2">
+      <div className="p-4 border-b border-border space-y-2">
         <div className="flex items-center justify-between">
           <h2 className="font-semibold">Contract Interaction</h2>
           <a
@@ -281,44 +280,44 @@ export function ContractInteraction({ contractAddress, abi }: ContractInteractio
         <div className="text-xs font-mono text-muted-foreground break-all">
           {contractAddress}
         </div>
-        </div>
+      </div>
 
-        <Tabs defaultValue="read" className="flex-1 flex flex-col min-h-0">
-            <TabsList className="mx-4 mt-4 grid w-[calc(100%-2rem)] grid-cols-2">
-            <TabsTrigger value="read" className="flex items-center gap-2">
-                <BookOpen className="h-4 w-4" />
-                Read ({readFunctions.length})
-            </TabsTrigger>
-            <TabsTrigger value="write" className="flex items-center gap-2">
-                <Edit className="h-4 w-4" />
-                Write ({writeFunctions.length})
-            </TabsTrigger>
-            </TabsList>
+      <Tabs defaultValue="read" className="flex-1 flex flex-col min-h-0">
+        <TabsList className="mx-4 mt-4 grid w-[calc(100%-2rem)] grid-cols-2">
+          <TabsTrigger value="read" className="flex items-center gap-2">
+            <BookOpen className="h-4 w-4" />
+            Read ({readFunctions.length})
+          </TabsTrigger>
+          <TabsTrigger value="write" className="flex items-center gap-2">
+            <Edit className="h-4 w-4" />
+            Write ({writeFunctions.length})
+          </TabsTrigger>
+        </TabsList>
 
-            <TabsContent value="read" className="flex-1 overflow-auto p-4 space-y-3 mt-0">
-            {readFunctions.length === 0 ? (
-                <p className="text-sm text-muted-foreground text-center py-8">
-                No read functions available
-                </p>
-            ) : (
-                readFunctions.map((func) => renderFunctionCard(func, false))
-            )}
-            </TabsContent>
+        <TabsContent value="read" className="flex-1 overflow-auto p-4 space-y-3 mt-0">
+          {readFunctions.length === 0 ? (
+            <p className="text-sm text-muted-foreground text-center py-8">
+              No read functions available
+            </p>
+          ) : (
+            readFunctions.map((func) => renderFunctionCard(func, false))
+          )}
+        </TabsContent>
 
-            <TabsContent value="write" className="flex-1 overflow-auto p-4 space-y-3 mt-0">
-            {!isConnected ? (
-                <p className="text-sm text-muted-foreground text-center py-8">
-                Connect your wallet to write to the contract
-                </p>
-            ) : writeFunctions.length === 0 ? (
-                <p className="text-sm text-muted-foreground text-center py-8">
-                No write functions available
-                </p>
-            ) : (
-                writeFunctions.map((func) => renderFunctionCard(func, true))
-            )}
-            </TabsContent>
-        </Tabs>
+        <TabsContent value="write" className="flex-1 overflow-auto p-4 space-y-3 mt-0">
+          {!isConnected ? (
+            <p className="text-sm text-muted-foreground text-center py-8">
+              Connect your wallet to write to the contract
+            </p>
+          ) : writeFunctions.length === 0 ? (
+            <p className="text-sm text-muted-foreground text-center py-8">
+              No write functions available
+            </p>
+          ) : (
+            writeFunctions.map((func) => renderFunctionCard(func, true))
+          )}
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

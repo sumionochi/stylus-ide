@@ -5,7 +5,7 @@ import { MonacoEditor } from '@/components/editor/MonacoEditor';
 import { ABIDialog } from '@/components/abi/ABIDialog';
 import { ConnectButton } from '@/components/wallet/ConnectButton';
 import { Button } from '@/components/ui/button';
-import { Bot, X, Play, FileCode, Trash2, Clock, CheckCircle2, XCircle, AlertTriangle, Download, Brain } from 'lucide-react';
+import { Bot, X, Play, FileCode, Trash2, Clock, CheckCircle2, XCircle, AlertTriangle, Download, Brain, FileText } from 'lucide-react';
 import { useState } from 'react';
 import { templates, getTemplate } from '@/lib/templates';
 import { useCompilation } from '@/hooks/useCompilation';
@@ -20,6 +20,7 @@ import { DeployDialog } from '@/components/deploy/DeployDialog';
 import { Upload } from 'lucide-react';
 import { useAccount } from 'wagmi';
 import { ContractInteraction } from '@/components/interact/ContractInteraction';
+import { ContractPlaceholder } from '@/components/interact/ContractPlaceholder';
 import { FaucetButton } from '@/components/wallet/FaucetButton';
 import { useFileTabs } from '@/hooks/useFileTabs';
 import { FileTabs } from '@/components/editor/FileTabs';
@@ -57,7 +58,21 @@ impl MyContract {
 `;
 
 export default function HomePage() {
-  const { showAIPanel, showOutput, isAIPanelCollapsed, setShowAIPanel, setShowOutput, toggleAIPanel, toggleOutput, toggleAIPanelCollapse } = usePanelState();
+  const {
+    showAIPanel,
+    showContractPanel,
+    showOutput,
+    isAIPanelCollapsed,
+    isContractPanelCollapsed,
+    setShowAIPanel,
+    setShowContractPanel,
+    setShowOutput,
+    toggleAIPanel,
+    toggleContractPanel,
+    toggleOutput,
+    toggleAIPanelCollapse,
+    toggleContractPanelCollapse
+  } = usePanelState();
   const { isMobile, isDesktop } = useResponsive();
   const {
     tabs,
@@ -318,7 +333,7 @@ export default function HomePage() {
               </DropdownMenuContent>
             </DropdownMenu>
 
-            {/* AI Panel Toggle - Mobile and Desktop */}
+            {/* AI Panel Toggle */}
             <Button
               variant="ghost"
               size="icon"
@@ -342,6 +357,32 @@ export default function HomePage() {
               }
             >
               <Bot className="h-5 w-5" />
+            </Button>
+
+            {/* Contract Panel Toggle */}
+            <Button
+              variant="ghost"
+              size="icon"
+              className="focus-visible-ring"
+              onClick={() => {
+                if (isMobile) {
+                  toggleContractPanel();
+                } else {
+                  toggleContractPanelCollapse();
+                }
+              }}
+              aria-label={
+                isMobile
+                  ? (showContractPanel ? 'Close contract panel' : 'Open contract panel')
+                  : (isContractPanelCollapsed ? 'Show contract panel' : 'Hide contract panel')
+              }
+              title={
+                isMobile
+                  ? (showContractPanel ? 'Close contract panel' : 'Open contract panel')
+                  : (isContractPanelCollapsed ? 'Show contract panel' : 'Hide contract panel')
+              }
+            >
+              <FileText className="h-5 w-5" />
             </Button>
           </div>
         </header>
@@ -513,45 +554,38 @@ export default function HomePage() {
             </section>
           </div>
 
-          {/* Right Sidebar - AI Panel / Contract Interaction (Improved Responsive) */}
-          <aside
-            className={`
-              transition-all duration-300 ease-in-out
-              ${showAIPanel
-                ? 'fixed inset-0 z-50 lg:relative lg:inset-auto lg:w-96 lg:max-w-[400px] lg:min-w-[320px]'
-                : 'hidden lg:block'
-              }
-              ${isAIPanelCollapsed
-                ? 'lg:w-0 lg:min-w-0 lg:max-w-0 lg:overflow-hidden'
-                : 'lg:w-96 lg:max-w-[400px] lg:min-w-[320px]'
-              }
-              border-l border-border bg-card
-              flex flex-col
-            `}
-          >
-            {/* Mobile Header */}
-            <div className="lg:hidden h-14 border-b border-border flex items-center justify-between px-4 bg-card/95 backdrop-blur-sm">
-              <span className="font-semibold">
-                {deployedContracts.length > 0 ? 'Contract Interaction' : 'AI Assistant'}
-              </span>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => setShowAIPanel(false)}
-                aria-label="Close AI panel"
-              >
-                <X className="h-5 w-5" />
-              </Button>
-            </div>
+          {/* Right Sidebar - AI Panel */}
+          {(showAIPanel || (!isAIPanelCollapsed && isDesktop)) && (
+            <aside
+              className={`
+                transition-all duration-300 ease-in-out
+                ${showAIPanel && isMobile
+                  ? 'fixed inset-0 z-50 bg-card'
+                  : 'hidden lg:block'
+                }
+                ${isAIPanelCollapsed
+                  ? 'lg:w-0 lg:min-w-0 lg:max-w-0 lg:overflow-hidden'
+                  : 'lg:w-96 lg:max-w-100 lg:min-w-[320px]'
+                }
+                border-l border-border bg-card
+                flex flex-col
+              `}
+            >
+              {/* Mobile Header */}
+              <div className="lg:hidden h-14 border-b border-border flex items-center justify-between px-4 bg-card/95 backdrop-blur-sm">
+                <span className="font-semibold">AI Assistant</span>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setShowAIPanel(false)}
+                  aria-label="Close AI panel"
+                >
+                  <X className="h-5 w-5" />
+                </Button>
+              </div>
 
-            {/* Panel Content */}
-            <div className="flex-1 min-h-0 lg:h-full">
-              {deployedContracts.length > 0 && abiData.abi ? (
-                <ContractInteraction
-                  contractAddress={deployedContracts[deployedContracts.length - 1].address}
-                  abi={abiData.abi}
-                />
-              ) : (
+              {/* AI Panel Content */}
+              <div className="flex-1 min-h-0 lg:h-full">
                 <ChatPanel
                   currentCode={activeTab?.content}
                   compilationErrors={errors}
@@ -561,16 +595,63 @@ export default function HomePage() {
                     }
                   }}
                 />
-              )}
-            </div>
-          </aside>
+              </div>
+            </aside>
+          )}
+
+          {/* Right Sidebar - Contract Panel */}
+          {(showContractPanel || (!isContractPanelCollapsed && isDesktop)) && (
+            <aside
+              className={`
+                transition-all duration-300 ease-in-out
+                ${showContractPanel && isMobile
+                  ? 'fixed inset-0 z-50 bg-card'
+                  : 'hidden lg:block'
+                }
+                ${isContractPanelCollapsed
+                  ? 'lg:w-0 lg:min-w-0 lg:max-w-0 lg:overflow-hidden'
+                  : 'lg:w-96 lg:max-w-100 lg:min-w-[320px]'
+                }
+                border-l border-border bg-card
+                flex flex-col
+              `}
+            >
+              {/* Mobile Header */}
+              <div className="lg:hidden h-14 border-b border-border flex items-center justify-between px-4 bg-card/95 backdrop-blur-sm">
+                <span className="font-semibold">Contract Interaction</span>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setShowContractPanel(false)}
+                  aria-label="Close contract panel"
+                >
+                  <X className="h-5 w-5" />
+                </Button>
+              </div>
+
+              {/* Contract Panel Content */}
+              <div className="flex-1 min-h-0 lg:h-full">
+                {deployedContracts.length > 0 && abiData.abi ? (
+                  <ContractInteraction
+                    contractAddress={deployedContracts[deployedContracts.length - 1].address}
+                    abi={abiData.abi}
+                  />
+                ) : (
+                  <ContractPlaceholder />
+                )}
+              </div>
+            </aside>
+          )}
 
           {/* Mobile Overlay */}
-          {showAIPanel && (
+          {(showAIPanel || showContractPanel) && (
             <div
               className="fixed inset-0 bg-background/80 panel-overlay z-40 lg:hidden"
-              onClick={() => setShowAIPanel(false)}
-              aria-label="Close AI panel"
+              onClick={() => {
+                setShowAIPanel(false);
+                setShowContractPanel(false);
+              }}
+              aria-label="Close panel"
             />
           )}
         </div>

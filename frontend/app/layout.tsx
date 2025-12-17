@@ -1,14 +1,14 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
 import "./globals.css";
 import { Providers } from "./providers";
-
-const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
   title: "Stylus IDE",
   description: "AI-powered Arbitrum Stylus development environment",
 };
+
+const systemFontStack =
+  "ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Segoe UI', Roboto, Helvetica, Arial, 'Apple Color Emoji', 'Segoe UI Emoji'";
 
 export default function RootLayout({
   children,
@@ -17,8 +17,8 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className="dark">
-      <body className={inter.className}>
-      <Providers>{children}</Providers>
+      <body style={{ fontFamily: systemFontStack }}>
+        <Providers>{children}</Providers>
       </body>
     </html>
   );
