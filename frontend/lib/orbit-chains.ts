@@ -1,33 +1,41 @@
 import { defineChain, type Chain } from "viem";
 
-// XAI Sepolia (Gaming-focused Orbit chain)
+/**
+ * Sources:
+ * - Xai Testnet v2: https://xai-foundation.gitbook.io/xai-network/technology/xai-chains-and-parameters/xai-testnet-v2
+ * - Rari Testnet: https://docs.rarichain.org/rari-chain/testnet
+ * - Sanko Testnet: https://docs.sanko.xyz/build-on-sanko/connect-to-sanko-testnet
+ * - (Sanko Mainnet for reference): https://docs.sanko.xyz/sanko-mainnet/connect-to-sanko-mainnet
+ */
+
+// Xai Testnet v2 (often referred to as "XAI Sepolia" in wallets/UIs)
 export const xaiSepolia = defineChain({
   id: 37714555429,
-  name: "XAI Sepolia",
-  network: "xai-sepolia",
+  name: "Xai Testnet v2",
+  network: "xai-testnet-v2",
   nativeCurrency: {
     decimals: 18,
-    name: "XAI",
-    symbol: "XAI",
+    name: "sXAI",
+    symbol: "sXAI",
   },
   rpcUrls: {
     default: {
-      http: ["https://testnet-v2.xai.games/rpc"],
+      http: ["https://testnet-v2.xai-chain.net/rpc"],
     },
     public: {
-      http: ["https://testnet-v2.xai.games/rpc"],
+      http: ["https://testnet-v2.xai-chain.net/rpc"],
     },
   },
   blockExplorers: {
     default: {
-      name: "XAI Explorer",
-      url: "https://testnet-explorer-v2.xai.games",
+      name: "XaiScan (Sepolia)",
+      url: "https://sepolia.xaiscan.io",
     },
   },
   testnet: true,
 });
 
-// Rari Chain Testnet (Creator-focused Orbit chain)
+// Rari Chain Testnet
 export const rariTestnet = defineChain({
   id: 1918988905,
   name: "Rari Testnet",
@@ -48,38 +56,65 @@ export const rariTestnet = defineChain({
   blockExplorers: {
     default: {
       name: "Rari Explorer",
-      url: "https://testnet.explorer.rarichain.org",
+      url: "https://explorer.rarichain.org",
     },
   },
   testnet: true,
 });
 
-// Sanko Testnet (DeFi-focused Orbit chain)
+// Sanko Testnet (Arbitrum Sepolia-based)
 export const sankoTestnet = defineChain({
-  id: 1996,
+  id: 1992,
   name: "Sanko Testnet",
   network: "sanko-testnet",
   nativeCurrency: {
     decimals: 18,
-    name: "DMT",
-    symbol: "DMT",
+    name: "tDMT",
+    symbol: "tDMT",
   },
   rpcUrls: {
     default: {
-      http: ["https://testnet.sanko.xyz"],
+      http: ["https://sanko-arb-sepolia.rpc.caldera.xyz/http"],
     },
     public: {
-      http: ["https://testnet.sanko.xyz"],
+      http: ["https://sanko-arb-sepolia.rpc.caldera.xyz/http"],
     },
   },
   blockExplorers: {
     default: {
-      name: "Sanko Explorer",
-      url: "https://testnet-explorer.sanko.xyz",
+      name: "SankoScan (Testnet)",
+      url: "https://testnet.sankoscan.io",
     },
   },
   testnet: true,
 });
+
+// (Optional) If you ALSO want Sanko mainnet in your app later, keep this export.
+// export const sankoMainnet = defineChain({
+//   id: 1996,
+//   name: "Sanko",
+//   network: "sanko",
+//   nativeCurrency: {
+//     decimals: 18,
+//     name: "DMT",
+//     symbol: "DMT",
+//   },
+//   rpcUrls: {
+//     default: {
+//       http: ["https://mainnet.sanko.xyz"],
+//     },
+//     public: {
+//       http: ["https://mainnet.sanko.xyz"],
+//     },
+//   },
+//   blockExplorers: {
+//     default: {
+//       name: "Sanko Explorer",
+//       url: "https://explorer.sanko.xyz",
+//     },
+//   },
+//   testnet: false,
+// });
 
 export interface OrbitChainInfo {
   id: number;
@@ -96,15 +131,16 @@ export interface OrbitChainInfo {
 export const orbitChains: OrbitChainInfo[] = [
   {
     id: xaiSepolia.id,
-    name: "XAI Sepolia",
+    name: "Xai Testnet v2",
     chain: xaiSepolia,
     focus: "Gaming & AI",
-    description: "Optimized for gaming applications with ML inference",
-    gasToken: "XAI",
+    description:
+      "Xai Orbit chain testnet v2 (sXAI gas) for gaming/AI workloads",
+    gasToken: "sXAI",
     benefits: [
-      "Lower gas costs for frequent predictions",
-      "Gaming-optimized infrastructure",
-      "Custom gas token economics",
+      "Gaming-focused Orbit ecosystem",
+      "Good fit for frequent inference calls",
+      "Dedicated explorer + infra",
     ],
     recommended: true,
   },
@@ -113,11 +149,11 @@ export const orbitChains: OrbitChainInfo[] = [
     name: "Rari Testnet",
     chain: rariTestnet,
     focus: "Creators & NFTs",
-    description: "Built for creator economy and content verification",
+    description: "Rari Chain testnet for creator apps and NFTs (ETH gas)",
     gasToken: "ETH",
     benefits: [
-      "Perfect for content authenticity checks",
-      "NFT trait generation with ML",
+      "Creator economy focus",
+      "NFT/content primitives",
       "Standard ETH gas token",
     ],
   },
@@ -126,12 +162,12 @@ export const orbitChains: OrbitChainInfo[] = [
     name: "Sanko Testnet",
     chain: sankoTestnet,
     focus: "DeFi & Trading",
-    description: "DeFi-focused chain with ML for predictions",
-    gasToken: "DMT",
+    description: "Sanko testnet (Arbitrum Sepolia-based) for DeFi experiments",
+    gasToken: "tDMT",
     benefits: [
-      "Trading signal generation",
-      "Risk assessment models",
-      "Custom DMT token economics",
+      "DeFi experimentation environment",
+      "Caldera-hosted RPC",
+      "Dedicated testnet explorer",
     ],
   },
 ];
