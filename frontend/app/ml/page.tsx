@@ -3,11 +3,12 @@
 import { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Trash2, Download, Upload, Sparkles, Brain, Zap, Loader2 } from 'lucide-react';
+import { Trash2, Download, Upload, Sparkles, Brain, Zap, Loader2, Rocket } from 'lucide-react';
 import { useAccount, usePublicClient, useWalletClient } from 'wagmi';
 import { parseAbi, type Address } from 'viem';
 import { ConnectButton } from '@/components/wallet/ConnectButton';
 import Link from 'next/link';
+import { BenchmarkDialog } from '@/components/orbit/BenchmarkDialog';
 
 const ML_CONTRACT_ABI = parseAbi([
   'function predict(uint8[] pixels) external view returns (uint256)',
@@ -35,6 +36,8 @@ export default function MLDemoPage() {
   const { address, isConnected } = useAccount();
   const publicClient = usePublicClient();
   const { data: walletClient } = useWalletClient();
+  const [showBenchmarkDialog, setShowBenchmarkDialog] = useState(false);
+  const [showOrbitExplorer, setShowOrbitExplorer] = useState(false);
 
   useEffect(() => {
     // Initialize canvas
@@ -329,16 +332,6 @@ export default function MLDemoPage() {
 
   return (
     <main className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="h-14 border-b border-border flex items-center justify-between px-4">
-        <div className="flex items-center gap-4">
-          <Link href="/" className="text-lg md:text-xl font-bold text-primary hover:opacity-80">
-            Stylus IDE
-          </Link>
-          <span className="text-sm text-muted-foreground hidden sm:inline">→ ML Demo</span>
-        </div>
-        <ConnectButton />
-      </header>
 
       <div className="container mx-auto p-6 max-w-6xl">
         {/* Title */}
@@ -540,22 +533,13 @@ export default function MLDemoPage() {
                     </CardDescription>
                   </div>
                   <Button
-                    onClick={runGasBenchmark}
-                    disabled={isRunningBenchmark || !contractAddress || !isConnected}
+                    onClick={() => setShowBenchmarkDialog(true)}
+                    disabled={!contractAddress || !isConnected}
                     size="sm"
                     variant="outline"
                   >
-                    {isRunningBenchmark ? (
-                      <>
-                        <Loader2 className="h-3 w-3 mr-2 animate-spin" />
-                        Running...
-                      </>
-                    ) : (
-                      <>
-                        <Zap className="h-3 w-3 mr-2" />
-                        Run Benchmark
-                      </>
-                    )}
+                    <Zap className="h-3 w-3 mr-2" />
+                    Multi-Chain Benchmark
                   </Button>
                 </div>
               </CardHeader>
@@ -691,6 +675,17 @@ export default function MLDemoPage() {
                 </p>
               </CardContent>
             </Card>
+
+            {/* Multi-Chain Benchmark Dialog */}
+            <BenchmarkDialog
+              open={showBenchmarkDialog}
+              onOpenChange={setShowBenchmarkDialog}
+              abi={ML_CONTRACT_ABI}
+              functionName="predict"
+              args={[getPixelData()]}
+              title="ML Inference: Multi-Chain Gas Benchmark"
+              description="Compare ML inference costs across Arbitrum and Orbit chains"
+            />
           </div>
         </div>
       </div>

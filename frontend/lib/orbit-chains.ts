@@ -1,11 +1,13 @@
 import { defineChain, type Chain } from "viem";
 
 /**
- * Sources:
- * - Xai Testnet v2: https://xai-foundation.gitbook.io/xai-network/technology/xai-chains-and-parameters/xai-testnet-v2
- * - Rari Testnet: https://docs.rarichain.org/rari-chain/testnet
- * - Sanko Testnet: https://docs.sanko.xyz/build-on-sanko/connect-to-sanko-testnet
- * - (Sanko Mainnet for reference): https://docs.sanko.xyz/sanko-mainnet/connect-to-sanko-mainnet
+ * Verified sources:
+ * - Xai Testnet v2 (Sepolia)
+ * - ApeChain Curtis (Testnet)
+ * - Nitrogen (Orbit Celestia) Testnet
+ *
+ * Note: “PublicNode” provider does not currently list these Orbit testnets like it does for Arbitrum Sepolia,
+ * so we include other public/free RPC providers (Caldera/official + thirdweb/dRPC/Ankr/etc).
  */
 
 // Xai Testnet v2 (often referred to as "XAI Sepolia" in wallets/UIs)
@@ -20,26 +22,75 @@ export const xaiSepolia = defineChain({
   },
   rpcUrls: {
     default: {
-      http: ["https://testnet-v2.xai-chain.net/rpc"],
+      http: [
+        "https://testnet-v2.xai-chain.net/rpc",
+        "https://rpc.ankr.com/xai_testnet",
+        "https://37714555429.rpc.thirdweb.com",
+        "https://xai-testnet.rpc.quicknode.com",
+      ],
     },
     public: {
-      http: ["https://testnet-v2.xai-chain.net/rpc"],
+      http: [
+        "https://testnet-v2.xai-chain.net/rpc",
+        "https://rpc.ankr.com/xai_testnet",
+        "https://37714555429.rpc.thirdweb.com",
+        "https://xai-testnet.rpc.quicknode.com",
+      ],
     },
   },
   blockExplorers: {
     default: {
       name: "XaiScan (Sepolia)",
-      url: "https://sepolia.xaiscan.io",
+      url: "https://sepolia.xaiscan.io/",
     },
   },
   testnet: true,
 });
 
-// Rari Chain Testnet
-export const rariTestnet = defineChain({
-  id: 1918988905,
-  name: "Rari Testnet",
-  network: "rari-testnet",
+// ApeChain Curtis (Testnet) — Arbitrum Orbit rollup
+export const apechainCurtis = defineChain({
+  id: 33111,
+  name: "ApeChain Curtis (Testnet)",
+  network: "apechain-curtis",
+  nativeCurrency: {
+    decimals: 18,
+    name: "ApeCoin",
+    symbol: "APE",
+  },
+  rpcUrls: {
+    default: {
+      http: [
+        "https://curtis.rpc.caldera.xyz/http",
+        "https://rpc.curtis.apechain.com",
+        "https://apechain-curtis.drpc.org",
+        "https://33111.rpc.thirdweb.com",
+        "https://curtis.gateway.tenderly.co",
+      ],
+    },
+    public: {
+      http: [
+        "https://curtis.rpc.caldera.xyz/http",
+        "https://rpc.curtis.apechain.com",
+        "https://apechain-curtis.drpc.org",
+        "https://33111.rpc.thirdweb.com",
+        "https://curtis.gateway.tenderly.co",
+      ],
+    },
+  },
+  blockExplorers: {
+    default: {
+      name: "Curtis Explorer",
+      url: "https://curtis.explorer.caldera.xyz/",
+    },
+  },
+  testnet: true,
+});
+
+// Nitrogen (Orbit Celestia) Testnet — settlement: Arbitrum Sepolia
+export const nitrogenTestnet = defineChain({
+  id: 96384675468,
+  name: "Nitrogen (Orbit Celestia) Testnet",
+  network: "nitrogen",
   nativeCurrency: {
     decimals: 18,
     name: "Ethereum",
@@ -47,74 +98,20 @@ export const rariTestnet = defineChain({
   },
   rpcUrls: {
     default: {
-      http: ["https://testnet.rpc.rarichain.org/http"],
+      http: ["https://nitrogen-rpc.altlayer.io"],
     },
     public: {
-      http: ["https://testnet.rpc.rarichain.org/http"],
+      http: ["https://nitrogen-rpc.altlayer.io"],
     },
   },
   blockExplorers: {
     default: {
-      name: "Rari Explorer",
-      url: "https://explorer.rarichain.org",
+      name: "Nitrogen Explorer",
+      url: "https://nitrogen-explorer.altlayer.io/",
     },
   },
   testnet: true,
 });
-
-// Sanko Testnet (Arbitrum Sepolia-based)
-export const sankoTestnet = defineChain({
-  id: 1992,
-  name: "Sanko Testnet",
-  network: "sanko-testnet",
-  nativeCurrency: {
-    decimals: 18,
-    name: "tDMT",
-    symbol: "tDMT",
-  },
-  rpcUrls: {
-    default: {
-      http: ["https://sanko-arb-sepolia.rpc.caldera.xyz/http"],
-    },
-    public: {
-      http: ["https://sanko-arb-sepolia.rpc.caldera.xyz/http"],
-    },
-  },
-  blockExplorers: {
-    default: {
-      name: "SankoScan (Testnet)",
-      url: "https://testnet.sankoscan.io",
-    },
-  },
-  testnet: true,
-});
-
-// (Optional) If you ALSO want Sanko mainnet in your app later, keep this export.
-// export const sankoMainnet = defineChain({
-//   id: 1996,
-//   name: "Sanko",
-//   network: "sanko",
-//   nativeCurrency: {
-//     decimals: 18,
-//     name: "DMT",
-//     symbol: "DMT",
-//   },
-//   rpcUrls: {
-//     default: {
-//       http: ["https://mainnet.sanko.xyz"],
-//     },
-//     public: {
-//       http: ["https://mainnet.sanko.xyz"],
-//     },
-//   },
-//   blockExplorers: {
-//     default: {
-//       name: "Sanko Explorer",
-//       url: "https://explorer.sanko.xyz",
-//     },
-//   },
-//   testnet: false,
-// });
 
 export interface OrbitChainInfo {
   id: number;
@@ -145,29 +142,32 @@ export const orbitChains: OrbitChainInfo[] = [
     recommended: true,
   },
   {
-    id: rariTestnet.id,
-    name: "Rari Testnet",
-    chain: rariTestnet,
-    focus: "Creators & NFTs",
-    description: "Rari Chain testnet for creator apps and NFTs (ETH gas)",
-    gasToken: "ETH",
+    id: apechainCurtis.id,
+    name: "ApeChain Curtis (Testnet)",
+    chain: apechainCurtis,
+    focus: "Gaming / Consumer Apps",
+    description:
+      "ApeChain public testnet (APE gas) on Arbitrum Orbit (Caldera infra)",
+    gasToken: "APE",
     benefits: [
-      "Creator economy focus",
-      "NFT/content primitives",
-      "Standard ETH gas token",
+      "Non-ETH gas token (good for comparisons)",
+      "Public Caldera + ApeChain RPC options",
+      "Great for benchmarking app-style workloads",
     ],
+    recommended: true,
   },
   {
-    id: sankoTestnet.id,
-    name: "Sanko Testnet",
-    chain: sankoTestnet,
-    focus: "DeFi & Trading",
-    description: "Sanko testnet (Arbitrum Sepolia-based) for DeFi experiments",
-    gasToken: "tDMT",
+    id: nitrogenTestnet.id,
+    name: "Nitrogen (Orbit Celestia) Testnet",
+    chain: nitrogenTestnet,
+    focus: "DA / Infra Experiments",
+    description:
+      "Arbitrum Orbit public testnet using Celestia DA (settles to Arbitrum Sepolia)",
+    gasToken: "ETH",
     benefits: [
-      "DeFi experimentation environment",
-      "Caldera-hosted RPC",
-      "Dedicated testnet explorer",
+      "Public RPC + explorer",
+      "Interesting Orbit + DA story for demos",
+      "Good baseline ETH-gas comparison vs other Orbit chains",
     ],
   },
 ];

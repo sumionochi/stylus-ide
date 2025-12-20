@@ -21,6 +21,7 @@ import {
 import { Loader2, ExternalLink, Copy, Check } from 'lucide-react';
 import { useChainId } from 'wagmi';
 import { arbitrum, arbitrumSepolia } from 'wagmi/chains';
+import { orbitChains } from '@/lib/orbit-chains';
 
 interface DeployDialogProps {
   open: boolean;
@@ -29,7 +30,10 @@ interface DeployDialogProps {
   onDeploySuccess?: (contractAddress: string, txHash?: string) => void;
 }
 
-const ARBITRUM_SEPOLIA_RPCS = [
+type RpcOption = { name: string; url: string };
+
+// Arbitrum RPCs
+const ARBITRUM_SEPOLIA_RPCS: RpcOption[] = [
   { name: 'Arbitrum Official', url: 'https://sepolia-rollup.arbitrum.io/rpc' },
   // ⚠️ demo is rate-limited — replace with your own key
   { name: 'Alchemy (demo - rate limited)', url: 'https://arb-sepolia.g.alchemy.com/v2/demo' },
@@ -37,10 +41,37 @@ const ARBITRUM_SEPOLIA_RPCS = [
   { name: 'Public Node', url: 'https://arbitrum-sepolia-rpc.publicnode.com' },
 ];
 
-const ARBITRUM_ONE_RPCS = [
+const ARBITRUM_ONE_RPCS: RpcOption[] = [
   { name: 'Arbitrum Official', url: 'https://arb1.arbitrum.io/rpc' },
   { name: 'Alchemy (demo - rate limited)', url: 'https://arb-mainnet.g.alchemy.com/v2/demo' },
 ];
+
+// Orbit RPCs (public/free where available)
+const ORBIT_RPCS_BY_CHAIN_ID: Record<number, RpcOption[]> = {
+  // Xai Testnet v2 (37714555429)
+  37714555429: [
+    { name: 'Xai Official', url: 'https://testnet-v2.xai-chain.net/rpc' },
+    { name: 'Ankr (public)', url: 'https://rpc.ankr.com/xai_testnet' },
+    { name: 'thirdweb (public)', url: 'https://37714555429.rpc.thirdweb.com' },
+    // Note: this endpoint may be rate-limited depending on provider policy
+    { name: 'QuickNode (public)', url: 'https://xai-testnet.rpc.quicknode.com' },
+  ],
+
+  // ApeChain Curtis Testnet (33111)
+  33111: [
+    { name: 'Caldera (official)', url: 'https://curtis.rpc.caldera.xyz/http' },
+    { name: 'ApeChain (Chainlist RPC)', url: 'https://rpc.curtis.apechain.com' },
+    { name: 'dRPC (public)', url: 'https://apechain-curtis.drpc.org' },
+    { name: 'thirdweb (public)', url: 'https://33111.rpc.thirdweb.com' },
+    // Keeping Tenderly as optional; if it fails for writes, use Caldera/ApeChain RPC
+    { name: 'Tenderly Gateway (may be limited)', url: 'https://curtis.gateway.tenderly.co' },
+  ],
+
+  // Nitrogen (Orbit Celestia) Testnet (96384675468)
+  96384675468: [
+    { name: 'AltLayer (official)', url: 'https://nitrogen-rpc.altlayer.io' },
+  ],
+};
 
 export function DeployDialog({
   open,
@@ -61,9 +92,32 @@ export function DeployDialog({
 
   const chainId = useChainId();
 
-  const availableRpcs = useMemo(() => {
-    return chainId === arbitrumSepolia.id ? ARBITRUM_SEPOLIA_RPCS : ARBITRUM_ONE_RPCS;
-  }, [chainId]);
+  const orbitInfo = useMemo(() => orbitChains.find((c) => c.id === chainId), [chainId]);
+
+  const chainDisplayName = useMemo(() => {
+    if (chainId === arbitrumSepolia.id) return 'Arbitrum Sepolia';
+    if (chainId === arbitrum.id) return 'Arbitrum One';
+    return orbitInfo?.name ?? `Chain ${chainId}`;
+  }, [chainId, orbitInfo]);
+
+  const availableRpcs: RpcOption[] = useMemo(() => {
+    if (chainId === arbitrumSepolia.id) return ARBITRUM_SEPOLIA_RPCS;
+    if (chainId === arbitrum.id) return ARBITRUM_ONE_RPCS;
+
+    // Orbit chain specific list
+    const orbitRpcs = ORBIT_RPCS_BY_CHAIN_ID[chainId];
+    if (orbitRpcs?.length) return orbitRpcs;
+
+    // Fallback: if chain is in orbitChains, at least show its default rpcUrls
+    if (orbitInfo?.chain?.rpcUrls?.default?.http?.length) {
+      return orbitInfo.chain.rpcUrls.default.http.map((url, idx) => ({
+        name: idx === 0 ? 'Default (from chain config)' : `RPC ${idx + 1}`,
+        url,
+      }));
+    }
+
+    return [];
+  }, [chainId, orbitInfo]);
 
   // ✅ Set default RPC safely (no setState during render)
   useEffect(() => {
@@ -73,16 +127,22 @@ export function DeployDialog({
     });
   }, [availableRpcs]);
 
+  const explorerBase = useMemo(() => {
+    if (chainId === arbitrumSepolia.id) return 'https://sepolia.arbiscan.io';
+    if (chainId === arbitrum.id) return 'https://arbiscan.io';
+
+    const url = orbitInfo?.chain?.blockExplorers?.default?.url;
+    return url ? url.replace(/\/$/, '') : null;
+  }, [chainId, orbitInfo]);
+
   const getExplorerUrl = (address: string) => {
-    if (chainId === arbitrumSepolia.id) return `https://sepolia.arbiscan.io/address/${address}`;
-    if (chainId === arbitrum.id) return `https://arbiscan.io/address/${address}`;
-    return `https://sepolia.arbiscan.io/address/${address}`;
+    const base = explorerBase ?? 'https://sepolia.arbiscan.io';
+    return `${base}/address/${address}`;
   };
 
   const getTxExplorerUrl = (txHash: string) => {
-    if (chainId === arbitrumSepolia.id) return `https://sepolia.arbiscan.io/tx/${txHash}`;
-    if (chainId === arbitrum.id) return `https://arbiscan.io/tx/${txHash}`;
-    return `https://sepolia.arbiscan.io/tx/${txHash}`;
+    const base = explorerBase ?? 'https://sepolia.arbiscan.io';
+    return `${base}/tx/${txHash}`;
   };
 
   const reset = () => {
@@ -146,8 +206,7 @@ export function DeployDialog({
         <DialogHeader>
           <DialogTitle>Deploy Contract</DialogTitle>
           <DialogDescription>
-            Deploy your compiled contract to{' '}
-            {chainId === arbitrumSepolia.id ? 'Arbitrum Sepolia' : 'Arbitrum One'}
+            Deploy your compiled contract to <strong>{chainDisplayName}</strong>
           </DialogDescription>
         </DialogHeader>
 
@@ -155,9 +214,9 @@ export function DeployDialog({
           <div className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="rpc-select">RPC Endpoint</Label>
-              <Select value={selectedRpc} onValueChange={setSelectedRpc}>
+              <Select value={selectedRpc} onValueChange={setSelectedRpc} disabled={availableRpcs.length === 0}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Select RPC endpoint" />
+                  <SelectValue placeholder={availableRpcs.length ? 'Select RPC endpoint' : 'No RPCs available'} />
                 </SelectTrigger>
                 <SelectContent>
                   {availableRpcs.map((rpc) => (
@@ -167,8 +226,9 @@ export function DeployDialog({
                   ))}
                 </SelectContent>
               </Select>
+
               <p className="text-xs text-muted-foreground">
-                If you see **429**, don’t use “Alchemy demo” — use your own key or Public Node.
+                Tip: If deployment fails, switch RPC and retry (some public RPCs can rate-limit writes).
               </p>
             </div>
 
@@ -223,7 +283,11 @@ export function DeployDialog({
                     <code className="flex-1 text-xs bg-muted p-2 rounded font-mono break-all">
                       {deployResult.contractAddress}
                     </code>
-                    <Button size="sm" variant="ghost" onClick={() => copyToClipboard(deployResult.contractAddress!, 'address')}>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => copyToClipboard(deployResult.contractAddress!, 'address')}
+                    >
                       {copiedAddress ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
                     </Button>
                     <Button size="sm" variant="ghost" asChild>
@@ -242,7 +306,11 @@ export function DeployDialog({
                     <code className="flex-1 text-xs bg-muted p-2 rounded font-mono break-all">
                       {deployResult.txHash}
                     </code>
-                    <Button size="sm" variant="ghost" onClick={() => copyToClipboard(deployResult.txHash!, 'tx')}>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => copyToClipboard(deployResult.txHash!, 'tx')}
+                    >
                       {copiedTx ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
                     </Button>
                     <Button size="sm" variant="ghost" asChild>

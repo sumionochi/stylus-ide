@@ -12,7 +12,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { arbitrum, arbitrumSepolia } from 'wagmi/chains';
-import { xaiSepolia, rariTestnet, sankoTestnet, isOrbitChain } from '@/lib/orbit-chains';
+import { xaiSepolia, apechainCurtis, nitrogenTestnet, isOrbitChain } from '@/lib/orbit-chains';
 
 export function ConnectButton() {
   const [mounted, setMounted] = useState(false);
@@ -24,11 +24,13 @@ export function ConnectButton() {
   const chainId = useChainId();
   const { switchChain } = useSwitchChain();
 
-  const supportedChains = useMemo(() => [arbitrumSepolia, 
+  const supportedChains = useMemo(() => [
+    arbitrumSepolia, 
     arbitrum,
     xaiSepolia,
-    rariTestnet,
-    sankoTestnet,], []);
+    apechainCurtis,
+    nitrogenTestnet,
+  ], []);
   const activeChain = supportedChains.find((c) => c.id === chainId);
   const isWrongNetwork = isConnected && !activeChain;
 

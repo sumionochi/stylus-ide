@@ -1,10 +1,16 @@
 import { http, createConfig } from "wagmi";
 import { arbitrum, arbitrumSepolia } from "wagmi/chains";
 import { injected } from "wagmi/connectors";
-import { xaiSepolia, rariTestnet, sankoTestnet } from "./orbit-chains";
+import { xaiSepolia, apechainCurtis, nitrogenTestnet } from "./orbit-chains";
 
 export const config = createConfig({
-  chains: [arbitrumSepolia, arbitrum, xaiSepolia, rariTestnet, sankoTestnet],
+  chains: [
+    arbitrumSepolia,
+    arbitrum,
+    xaiSepolia,
+    apechainCurtis,
+    nitrogenTestnet,
+  ],
   connectors: [
     injected(), // MetaMask, Rabby, Rainbow, Coinbase Wallet, etc.
   ],
@@ -12,7 +18,7 @@ export const config = createConfig({
     [arbitrumSepolia.id]: http(),
     [arbitrum.id]: http(),
     [xaiSepolia.id]: http(),
-    [rariTestnet.id]: http(),
-    [sankoTestnet.id]: http(),
+    [apechainCurtis.id]: http(),
+    [nitrogenTestnet.id]: http(),
   },
 });

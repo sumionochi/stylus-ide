@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import { useChainId, useAccount } from 'wagmi';
 import { arbitrumSepolia } from 'wagmi/chains';
 import { Button } from '@/components/ui/button';
@@ -44,17 +45,23 @@ const FAUCETS = [
     description: 'Requires mainnet balance',
   },
 
-  // ✅ Orbit chain faucets (grouped separately in UI)
+  // Orbit chain faucets
   {
-    name: 'XAI Faucet',
+    name: 'XAI Testnet Faucet',
     url: 'https://faucet.xai.games',
-    description: 'Get XAI testnet tokens',
+    description: 'Get sXAI testnet tokens',
     isOrbit: true,
   },
   {
-    name: 'Rari Faucet',
-    url: 'https://faucet.rarichain.org',
-    description: 'Get Rari testnet ETH',
+    name: 'ApeChain Curtis Faucet',
+    url: 'https://curtis.hub.caldera.xyz/',
+    description: 'Get APE testnet tokens (via Caldera)',
+    isOrbit: true,
+  },
+  {
+    name: 'Nitrogen Testnet Faucet',
+    url: 'https://nitrogen-faucet.altlayer.io/',
+    description: 'Get ETH for Nitrogen testnet',
     isOrbit: true,
   },
 ];
@@ -74,11 +81,14 @@ const ETH_SEPOLIA_FAUCETS = [
 ];
 
 export function FaucetButton() {
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+
   const chainId = useChainId();
   const { address } = useAccount();
 
-  // Only show on Arbitrum Sepolia
-  if (chainId !== arbitrumSepolia.id) {
+  // ✅ Prevent hydration mismatch: render nothing until client mounted
+  if (!mounted) {
     return null;
   }
 
