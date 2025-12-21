@@ -5,6 +5,7 @@
         "Chainlink",
         "Chainlist",
         "numpy",
+        "QLEARNING",
         "scikit",
         "thirdweb"
     ]

@@ -181,12 +181,12 @@ export function ChatPanel({
                                     {String(children).replace(/\n$/, '')}
                                   </SyntaxHighlighter>
                                 ) : (
-                                  <code className={`${className} break-words`} {...props}>
+                                  <code className={`${className} wrap-break-words`} {...props}>
                                     {children}
                                   </code>
                                 );
                               },
-                              p: ({ children }) => <p className="break-words">{children}</p>,
+                              p: ({ children }) => <p className="wrap-break-words">{children}</p>,
                             }}
                           >
                             {message.content}
@@ -248,7 +248,7 @@ export function ChatPanel({
             )}
 
             {error && (
-              <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-3 text-sm text-destructive break-words">
+              <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-3 text-sm text-destructive wrap-break-words">
                 {error}
               </div>
             )}

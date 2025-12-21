@@ -125,8 +125,10 @@ export default function HomePage() {
     useCompilation();
   const [parsedAbi, setParsedAbi] = useState<any>(null);
 
-  // ✅ NEW: Workspace tab (Editor vs Orbit Explorer vs ML)
-  const [workspaceTab, setWorkspaceTab] = useState<'editor' | 'orbit' | 'ml'>('editor');
+  // ✅ NEW: Workspace tab (Editor vs Orbit Explorer vs ML vs Q-Learning)
+  const [workspaceTab, setWorkspaceTab] = useState<'editor' | 'orbit' | 'ml' | 'qlearning'>(
+    'editor'
+  );
 
   // ✅ Prevent hydration mismatch for responsive-based conditional rendering
   const [mounted, setMounted] = useState(false);
@@ -292,8 +294,18 @@ export default function HomePage() {
   return (
     <>
       <SetupGuide />
-      <ABIDialog open={showABIDialog} onOpenChange={setShowABIDialog} abi={abiData.abi} solidity={abiData.solidity} />
-      <DeployDialog open={showDeployDialog} onOpenChange={setShowDeployDialog} sessionId={sessionId} onDeploySuccess={handleDeploySuccess} />
+      <ABIDialog
+        open={showABIDialog}
+        onOpenChange={setShowABIDialog}
+        abi={abiData.abi}
+        solidity={abiData.solidity}
+      />
+      <DeployDialog
+        open={showDeployDialog}
+        onOpenChange={setShowDeployDialog}
+        sessionId={sessionId}
+        onDeploySuccess={handleDeploySuccess}
+      />
 
       <main className="h-screen flex flex-col bg-background">
         {/* Header */}
@@ -361,7 +373,10 @@ export default function HomePage() {
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
                 {templates.map((template) => (
-                  <DropdownMenuItem key={template.id} onClick={() => handleLoadTemplate(template.id)}>
+                  <DropdownMenuItem
+                    key={template.id}
+                    onClick={() => handleLoadTemplate(template.id)}
+                  >
                     <div>
                       <div className="font-medium">{template.name}</div>
                       <div className="text-xs text-muted-foreground">{template.description}</div>
@@ -441,7 +456,7 @@ export default function HomePage() {
           </div>
         </header>
 
-        {/* ✅ Workspace Tabs Bar (Editor / Orbit Explorer / ML) */}
+        {/* ✅ Workspace Tabs Bar (Editor / Orbit Explorer / ML / Q-Learning) */}
         <div className="h-10 border-b border-border bg-card flex items-center px-4 gap-2">
           <Button
             size="sm"
@@ -467,6 +482,14 @@ export default function HomePage() {
           >
             On-chain ML Inference
           </Button>
+          <Button
+            size="sm"
+            variant={workspaceTab === 'qlearning' ? 'secondary' : 'ghost'}
+            onClick={() => setWorkspaceTab('qlearning')}
+            className="h-7"
+          >
+            Q-Learning
+          </Button>
         </div>
 
         {/* Main Content Area with Responsive Layout */}
@@ -483,11 +506,12 @@ export default function HomePage() {
             ) : workspaceTab === 'ml' ? (
               // ✅ ML Tab: embed /ml-demo as a tab view
               <section className="flex-1 min-h-0 bg-background">
-                <iframe
-                  title="On-chain ML Inference"
-                  src="/ml"
-                  className="w-full h-full border-0"
-                />
+                <iframe title="On-chain ML Inference" src="/ml" className="w-full h-full border-0" />
+              </section>
+            ) : workspaceTab === 'qlearning' ? (
+              // ✅ Q-Learning Tab: embed /qlearning as a tab view
+              <section className="flex-1 min-h-0 bg-background">
+                <iframe title="Q-Learning" src="/qlearning" className="w-full h-full border-0" />
               </section>
             ) : (
               <>
@@ -641,7 +665,10 @@ export default function HomePage() {
                         <p className="text-blue-400 animate-pulse">Starting compilation...</p>
                       )}
                       {output.map((item, index) => (
-                        <div key={index} className={`flex items-start gap-2 ${getOutputColor(item.type)}`}>
+                        <div
+                          key={index}
+                          className={`flex items-start gap-2 ${getOutputColor(item.type)}`}
+                        >
                           {getOutputIcon(item.type)}
                           <span className="flex-1 whitespace-pre-wrap break-anywhere">
                             {stripAnsiCodes(item.data)}
@@ -673,7 +700,12 @@ export default function HomePage() {
               {/* Mobile Header */}
               <div className="lg:hidden h-14 border-b border-border flex items-center justify-between px-4 bg-card/95 backdrop-blur-sm">
                 <span className="font-semibold">AI Assistant</span>
-                <Button variant="ghost" size="icon" onClick={() => setShowAIPanel(false)} aria-label="Close AI panel">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setShowAIPanel(false)}
+                  aria-label="Close AI panel"
+                >
                   <X className="h-5 w-5" />
                 </Button>
               </div>

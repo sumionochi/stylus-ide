@@ -376,7 +376,6 @@ export async function exportContractABI(
   error?: string;
   details?: string;
 }> {
-  // Keep under your Next route maxDuration=60s
   const timeoutMs = Math.min(COMPILATION_CONSTANTS.COMPILE_TIMEOUT, 180_000);
 
   // 1) Solidity interface
