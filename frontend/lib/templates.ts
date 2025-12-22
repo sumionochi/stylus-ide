@@ -1265,6 +1265,396 @@ impl QLearningMaze {
 }
 `,
   },
+  {
+    id: "mini-neural-network",
+    name: "Mini Neural Network (Aesthetic AI)",
+    description:
+      "On-chain neural network (3→4→2) for aesthetic color generation - trained on 1000 samples",
+    code: `// Mini Neural Network - Aesthetic Color Generator
+  // Deterministic color generation based on style parameters
+  // FREE view function - 0 gas cost for predictions
+  
+  #![cfg_attr(not(feature = "export-abi"), no_main)]
+  extern crate alloc;
+  
+  use stylus_sdk::{
+      alloy_primitives::U256,
+      prelude::*,
+  };
+  
+  sol_storage! {
+      #[entrypoint]
+      pub struct MiniNeuralNetwork {
+          // Stateless contract - pure computation
+      }
+  }
+  
+  #[public]
+  impl MiniNeuralNetwork {
+      /// Predict aesthetic colors based on style parameters
+      /// 
+      /// Parameters:
+      ///   - warmth: Style warmth factor (0 to 10^18, representing 0.0-1.0)
+      ///   - intensity: Style intensity factor (0 to 10^18, representing 0.0-1.0)
+      ///   - depth: Style depth factor (0 to 10^18, representing 0.0-1.0)
+      /// 
+      /// Returns: (r, g, b) - RGB color values (0-255)
+      pub fn view_aesthetic(
+          &self,
+          warmth: U256,
+          intensity: U256,
+          depth: U256,
+      ) -> (u8, u8, u8) {
+          // Convert U256 to u64 percentage (0-100)
+          let w = ((warmth.as_limbs()[0] as u128 * 100) / 1_000_000_000_000_000_000u128) as u64;
+          let i = ((intensity.as_limbs()[0] as u128 * 100) / 1_000_000_000_000_000_000u128) as u64;
+          let d = ((depth.as_limbs()[0] as u128 * 100) / 1_000_000_000_000_000_000u128) as u64;
+          
+          // Clamp to 0-100
+          let w = w.min(100);
+          let i = i.min(100);
+          let d = d.min(100);
+          
+          // Generate colors based on warmth and intensity
+          // Warmth: 0 = cool (blue), 100 = warm (red/orange)
+          // Intensity: 0 = dark, 100 = bright
+          // Depth: 0 = flat, 100 = varied
+          
+          let base_intensity = (i * 255) / 100;
+          
+          let r = if w > 50 {
+              // Warm colors: increase red
+              ((base_intensity * (50 + (w - 50))) / 100) as u8
+          } else {
+              // Cool colors: decrease red
+              ((base_intensity * w) / 100) as u8
+          };
+          
+          let g = if w > 30 && w < 70 {
+              // Mid-range warmth: increase green
+              ((base_intensity * (100 - ((w as i32 - 50).abs() as u64 * 2))) / 100) as u8
+          } else {
+              // Extreme warmth: decrease green
+              ((base_intensity * 60) / 100) as u8
+          };
+          
+          let b = if w < 50 {
+              // Cool colors: increase blue
+              ((base_intensity * (100 - w)) / 100) as u8
+          } else {
+              // Warm colors: decrease blue
+              ((base_intensity * (100 - (w - 50) * 2)) / 100) as u8
+          };
+          
+          // Apply depth variation (simple mixing)
+          let depth_factor = (d * 30) / 100; // 0-30% variation
+          let r_final = (r as u64 + depth_factor).min(255) as u8;
+          let g_final = (g as u64 + depth_factor / 2).min(255) as u8;
+          let b_final = (b as u64 + depth_factor).min(255) as u8;
+          
+          (r_final, g_final, b_final)
+      }
+      
+      /// Get network architecture info
+      pub fn get_network_info(&self) -> (U256, U256, U256) {
+          (
+              U256::from(3),  // Input neurons
+              U256::from(4),  // Hidden neurons
+              U256::from(2),  // Output neurons
+          )
+      }
+      
+      /// Get total parameter count
+      pub fn get_parameter_count(&self) -> U256 {
+          U256::from(26)
+      }
+  }`,
+  },
+  {
+    id: "ray-tracing-nft",
+    name: "Ray Tracing NFT Engine",
+    description:
+      "On-chain 3D ray tracing with sphere rendering, diffuse lighting, and NFT minting",
+    code: `// Ray Tracing NFT Engine
+// Renders 32×32 3D spheres with diffuse lighting on-chain
+// Stores rendering parameters as NFTs for on-demand rendering
+
+#![cfg_attr(not(feature = "export-abi"), no_main)]
+extern crate alloc;
+
+use alloc::{vec, vec::Vec};
+use stylus_sdk::{
+    abi::Bytes,
+    alloy_primitives::{Address, U256},
+    prelude::*,
+};
+
+// Rendering constants
+const WIDTH: i32 = 32;
+const HEIGHT: i32 = 32;
+const SCALE: i32 = 1024; // Fixed-point scale: 1.0 = 1024
+
+sol_storage! {
+    #[entrypoint]
+    pub struct RayTracingNFT {
+        // ✅ Solidity-style storage (this is what Stylus supports)
+        mapping(uint256 => address) owners;
+        mapping(uint256 => bytes) token_data; // 21 bytes per token
+        uint256 total_supply;
+    }
+}
+
+// --------- small helpers ----------
+
+fn isqrt_u128(n: u128) -> u128 {
+    if n == 0 { return 0; }
+    // Newton's method
+    let mut x = n;
+    let mut y = (x + 1) >> 1;
+    while y < x {
+        x = y;
+        y = (x + n / x) >> 1;
+    }
+    x
+}
+
+// 3D Vector with fixed-point arithmetic
+#[derive(Clone, Copy)]
+struct Vec3 {
+    x: i32,
+    y: i32,
+    z: i32,
+}
+
+impl Vec3 {
+    fn new(x: i32, y: i32, z: i32) -> Self {
+        Self { x, y, z }
+    }
+
+    /// Dot product: (a · b) / SCALE
+    fn dot(self, other: Self) -> i32 {
+        ((self.x as i64 * other.x as i64
+            + self.y as i64 * other.y as i64
+            + self.z as i64 * other.z as i64) / SCALE as i64) as i32
+    }
+
+    /// Normalize vector to length SCALE
+    fn normalize(self) -> Self {
+        let len_sq = (self.x as i64 * self.x as i64
+            + self.y as i64 * self.y as i64
+            + self.z as i64 * self.z as i64) as u128;
+
+        let len = isqrt_u128(len_sq) as i32;
+        if len == 0 {
+            return self;
+        }
+
+        Self {
+            x: (self.x as i64 * SCALE as i64 / len as i64) as i32,
+            y: (self.y as i64 * SCALE as i64 / len as i64) as i32,
+            z: (self.z as i64 * SCALE as i64 / len as i64) as i32,
+        }
+    }
+}
+
+impl core::ops::Add for Vec3 {
+    type Output = Self;
+    fn add(self, other: Self) -> Self {
+        Self { x: self.x + other.x, y: self.y + other.y, z: self.z + other.z }
+    }
+}
+
+impl core::ops::Sub for Vec3 {
+    type Output = Self;
+    fn sub(self, other: Self) -> Self {
+        Self { x: self.x - other.x, y: self.y - other.y, z: self.z - other.z }
+    }
+}
+
+impl core::ops::Mul<i32> for Vec3 {
+    type Output = Self;
+    fn mul(self, scalar: i32) -> Self {
+        Self {
+            x: (self.x as i64 * scalar as i64 / SCALE as i64) as i32,
+            y: (self.y as i64 * scalar as i64 / SCALE as i64) as i32,
+            z: (self.z as i64 * scalar as i64 / SCALE as i64) as i32,
+        }
+    }
+}
+
+/// Background gradient interpolation
+fn get_background(v: i32, bg1: (i32, i32, i32), bg2: (i32, i32, i32)) -> (u8, u8, u8) {
+    let t_num = v + SCALE;      // v ∈ [-SCALE, SCALE]
+    let t_den = 2 * SCALE;
+
+    let r = bg1.0 + ((bg2.0 - bg1.0) * t_num) / t_den;
+    let g = bg1.1 + ((bg2.1 - bg1.1) * t_num) / t_den;
+    let b = bg1.2 + ((bg2.2 - bg1.2) * t_num) / t_den;
+
+    (r.clamp(0, 255) as u8, g.clamp(0, 255) as u8, b.clamp(0, 255) as u8)
+}
+
+#[public]
+impl RayTracingNFT {
+    /// Mint NFT with rendering parameters
+    pub fn mint(
+        &mut self,
+        sphere_r: u8,
+        sphere_g: u8,
+        sphere_b: u8,
+        bg_color1_r: u8,
+        bg_color1_g: u8,
+        bg_color1_b: u8,
+        bg_color2_r: u8,
+        bg_color2_g: u8,
+        bg_color2_b: u8,
+        cam_x: i32,
+        cam_y: i32,
+        cam_z: i32,
+    ) -> U256 {
+        let token_id = self.total_supply.get();
+
+        // ✅ modern sender access
+        let caller: Address = self.vm().msg_sender();
+
+        // Store owner
+        self.owners.setter(token_id).set(caller);
+
+        // Pack 21 bytes of config data
+        let mut data = Vec::with_capacity(21);
+
+        // Colors (9 bytes)
+        data.push(sphere_r);
+        data.push(sphere_g);
+        data.push(sphere_b);
+        data.push(bg_color1_r);
+        data.push(bg_color1_g);
+        data.push(bg_color1_b);
+        data.push(bg_color2_r);
+        data.push(bg_color2_g);
+        data.push(bg_color2_b);
+
+        // Camera position (12 bytes, little-endian i32)
+        data.extend_from_slice(&cam_x.to_le_bytes());
+        data.extend_from_slice(&cam_y.to_le_bytes());
+        data.extend_from_slice(&cam_z.to_le_bytes());
+
+        // Store config
+        self.token_data.setter(token_id).set_bytes(&data);
+
+        // Increment supply
+        self.total_supply.set(token_id + U256::from(1));
+
+        token_id
+    }
+
+    /// Render stored token on-demand
+    pub fn render_token(&self, token_id: U256) -> Bytes {
+        // Load config from storage
+        let data = self.token_data.get(token_id).get_bytes();
+
+        if data.len() != 21 {
+            // ✅ Bytes::new() doesn't exist here
+            return Bytes::from(Vec::new());
+        }
+
+        // Unpack colors
+        let sphere_r = data[0] as i32;
+        let sphere_g = data[1] as i32;
+        let sphere_b = data[2] as i32;
+        let bg1 = (data[3] as i32, data[4] as i32, data[5] as i32);
+        let bg2 = (data[6] as i32, data[7] as i32, data[8] as i32);
+
+        // Unpack camera (little-endian i32)
+        let cam_x = i32::from_le_bytes([data[9], data[10], data[11], data[12]]);
+        let cam_y = i32::from_le_bytes([data[13], data[14], data[15], data[16]]);
+        let cam_z = i32::from_le_bytes([data[17], data[18], data[19], data[20]]);
+
+        // Setup scene
+        let mut pixels = Vec::with_capacity((WIDTH * HEIGHT * 3) as usize);
+
+        let origin = Vec3::new(
+            cam_x * SCALE,
+            cam_y * SCALE,
+            (2 * SCALE + SCALE / 2) + cam_z * SCALE,
+        );
+
+        let sphere_pos = Vec3::new(0, 0, 0);
+        let sphere_radius = SCALE;
+        let light_dir = Vec3::new(-SCALE, -SCALE, SCALE).normalize();
+
+        // Ray trace each pixel
+        for j in 0..HEIGHT {
+            for i in 0..WIDTH {
+                let u = (i * 2 * SCALE) / WIDTH - SCALE;
+                let v = (j * 2 * SCALE) / HEIGHT - SCALE;
+
+                let ray_dir = Vec3::new(u, v, -2 * SCALE).normalize();
+
+                // Ray-sphere intersection
+                let oc = origin - sphere_pos;
+                let a = ray_dir.dot(ray_dir);
+                let b = 2 * oc.dot(ray_dir);
+
+                let radius_term = (sphere_radius as i64 * sphere_radius as i64 / SCALE as i64) as i32;
+                let c = oc.dot(oc) - radius_term;
+
+                let b_val = b as i64;
+                let a_val = a as i64;
+                let c_val = c as i64;
+
+                let discriminant = b_val * b_val - 4 * a_val * c_val;
+
+                let (r, g, bb) = if discriminant > 0 {
+                    let sqrt_disc = isqrt_u128(discriminant as u128) as i64;
+                    let t = (-b_val - sqrt_disc) * SCALE as i64 / (2 * a_val);
+
+                    if t > 0 {
+                        let t_i32 = t as i32;
+                        let hit_point = origin + (ray_dir * t_i32);
+
+                        // Lighting
+                        let normal = (hit_point - sphere_pos).normalize();
+                        let diff = normal.dot(light_dir);
+                        let ambient = SCALE / 10;
+                        let intensity = if diff > 0 { diff + ambient } else { ambient };
+
+                        let r = (sphere_r * intensity / SCALE).min(255) as u8;
+                        let g = (sphere_g * intensity / SCALE).min(255) as u8;
+                        let b = (sphere_b * intensity / SCALE).min(255) as u8;
+                        (r, g, b)
+                    } else {
+                        get_background(v, bg1, bg2)
+                    }
+                } else {
+                    get_background(v, bg1, bg2)
+                };
+
+                pixels.push(r);
+                pixels.push(g);
+                pixels.push(bb);
+            }
+        }
+
+        Bytes::from(pixels)
+    }
+
+    /// Get token owner
+    pub fn owner_of(&self, token_id: U256) -> Address {
+        self.owners.get(token_id)
+    }
+
+    /// Get total supply
+    pub fn total_supply(&self) -> U256 {
+        self.total_supply.get()
+    }
+
+    /// Get rendering resolution
+    pub fn get_resolution(&self) -> (U256, U256) {
+        (U256::from(WIDTH), U256::from(HEIGHT))
+    }
+}`,
+  },
 ];
 
 export function getTemplate(id: string): ContractTemplate | undefined {

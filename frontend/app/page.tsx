@@ -125,10 +125,10 @@ export default function HomePage() {
     useCompilation();
   const [parsedAbi, setParsedAbi] = useState<any>(null);
 
-  // ✅ NEW: Workspace tab (Editor vs Orbit Explorer vs ML vs Q-Learning)
-  const [workspaceTab, setWorkspaceTab] = useState<'editor' | 'orbit' | 'ml' | 'qlearning'>(
-    'editor'
-  );
+  // ✅ NEW: Workspace tab (Editor vs Orbit Explorer vs ML vs Q-Learning vs Raytracing)
+  const [workspaceTab, setWorkspaceTab] = useState<
+    'editor' | 'orbit' | 'ml' | 'qlearning' | 'raytracing'
+  >('editor');
 
   // ✅ Prevent hydration mismatch for responsive-based conditional rendering
   const [mounted, setMounted] = useState(false);
@@ -456,7 +456,7 @@ export default function HomePage() {
           </div>
         </header>
 
-        {/* ✅ Workspace Tabs Bar (Editor / Orbit Explorer / ML / Q-Learning) */}
+        {/* ✅ Workspace Tabs Bar (Editor / Orbit Explorer / ML / Q-Learning / Raytracing) */}
         <div className="h-10 border-b border-border bg-card flex items-center px-4 gap-2">
           <Button
             size="sm"
@@ -490,6 +490,14 @@ export default function HomePage() {
           >
             Q-Learning
           </Button>
+          <Button
+            size="sm"
+            variant={workspaceTab === 'raytracing' ? 'secondary' : 'ghost'}
+            onClick={() => setWorkspaceTab('raytracing')}
+            className="h-7"
+          >
+            Raytracing
+          </Button>
         </div>
 
         {/* Main Content Area with Responsive Layout */}
@@ -512,6 +520,11 @@ export default function HomePage() {
               // ✅ Q-Learning Tab: embed /qlearning as a tab view
               <section className="flex-1 min-h-0 bg-background">
                 <iframe title="Q-Learning" src="/qlearning" className="w-full h-full border-0" />
+              </section>
+            ) : workspaceTab === 'raytracing' ? (
+              // ✅ Raytracing Tab: embed /raytracing as a tab view
+              <section className="flex-1 min-h-0 bg-background">
+                <iframe title="Raytracing" src="/raytracing" className="w-full h-full border-0" />
               </section>
             ) : (
               <>
