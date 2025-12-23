@@ -1,30 +1,31 @@
 'use client';
 
+import Link from 'next/link';
+import { useEffect, useMemo, useState } from 'react';
+import {
+  AlertTriangle,
+  Bot,
+  CheckCircle2,
+  Clock,
+  Download,
+  FileCode,
+  FileText,
+  MoreVertical,
+  Play,
+  Trash2,
+  Upload,
+  X,
+  XCircle,
+  Zap,
+} from 'lucide-react';
+import { useAccount } from 'wagmi';
+
 import { SetupGuide } from '@/components/setup/SetupGuide';
 import { MonacoEditor } from '@/components/editor/MonacoEditor';
 import { ABIDialog } from '@/components/abi/ABIDialog';
 import { ConnectButton } from '@/components/wallet/ConnectButton';
+import { FaucetButton } from '@/components/wallet/FaucetButton';
 import { Button } from '@/components/ui/button';
-import {
-  Bot,
-  X,
-  Play,
-  FileCode,
-  Trash2,
-  Clock,
-  CheckCircle2,
-  XCircle,
-  AlertTriangle,
-  Download,
-  Brain,
-  FileText,
-  Zap,
-  Rocket,
-} from 'lucide-react';
-import { useEffect, useState } from 'react';
-import { templates, getTemplate } from '@/lib/templates';
-import { useCompilation } from '@/hooks/useCompilation';
-import { stripAnsiCodes, formatCompilationTime } from '@/lib/output-formatter';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -32,23 +33,24 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { DeployDialog } from '@/components/deploy/DeployDialog';
-import { Upload } from 'lucide-react';
-import { useAccount } from 'wagmi';
 import { ContractInteraction } from '@/components/interact/ContractInteraction';
 import { ContractPlaceholder } from '@/components/interact/ContractPlaceholder';
-import { FaucetButton } from '@/components/wallet/FaucetButton';
-import { useFileTabs } from '@/hooks/useFileTabs';
 import { FileTabs } from '@/components/editor/FileTabs';
 import { ChatPanel } from '@/components/ai/ChatPanel';
-import { usePanelState } from '@/hooks/usePanelState';
-import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
-import { useResponsive } from '@/hooks/useResponsive';
 import { KeyboardShortcutHint } from '@/components/ui/KeyboardShortcutHint';
-import Link from 'next/link';
 import { BenchmarkDialog } from '@/components/orbit/BenchmarkDialog';
 import { OrbitExplorer } from '@/components/orbit/OrbitExplorer';
 
+import { templates, getTemplate } from '@/lib/templates';
+import { stripAnsiCodes, formatCompilationTime } from '@/lib/output-formatter';
+import { useCompilation } from '@/hooks/useCompilation';
+import { useFileTabs } from '@/hooks/useFileTabs';
+import { usePanelState } from '@/hooks/usePanelState';
+import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
+import { useResponsive } from '@/hooks/useResponsive';
+
 const DEFAULT_CODE = `// Welcome to Stylus IDE
+
 #![cfg_attr(not(feature = "export-abi"), no_main)]
 extern crate alloc;
 
@@ -56,21 +58,21 @@ use stylus_sdk::prelude::*;
 use stylus_sdk::alloy_primitives::U256;
 
 sol_storage! {
-    #[entrypoint]
-    pub struct MyContract {
-        uint256 value;
-    }
+  #[entrypoint]
+  pub struct MyContract {
+    uint256 value;
+  }
 }
 
 #[public]
 impl MyContract {
-    pub fn get_value(&self) -> U256 {
-        self.value.get()
-    }
+  pub fn get_value(&self) -> U256 {
+    self.value.get()
+  }
 
-    pub fn set_value(&mut self, new_value: U256) {
-        self.value.set(new_value);
-    }
+  pub fn set_value(&mut self, new_value: U256) {
+    self.value.set(new_value);
+  }
 }
 `;
 
@@ -102,7 +104,6 @@ export default function HomePage() {
     updateTabContent,
     setActiveTab,
     renameTab,
-    getTabsCode,
   } = useFileTabs(DEFAULT_CODE);
 
   const [showABIDialog, setShowABIDialog] = useState(false);
@@ -112,29 +113,39 @@ export default function HomePage() {
   });
   const [isExportingABI, setIsExportingABI] = useState(false);
   const [showDeployDialog, setShowDeployDialog] = useState(false);
-  const [deployedContracts, setDeployedContracts] = useState<
-    Array<{
-      address: string;
-      txHash?: string;
-    }>
-  >([]);
+  const [deployedContracts, setDeployedContracts] = useState<Array<{ address: string; txHash?: string }>>(
+    []
+  );
 
   const { isConnected } = useAccount();
+
   const [showBenchmarkDialog, setShowBenchmarkDialog] = useState(false);
   const { isCompiling, output, errors, compilationTime, sessionId, compile, clearOutput } =
     useCompilation();
+
   const [parsedAbi, setParsedAbi] = useState<any>(null);
 
-  // ✅ NEW: Workspace tab (Editor vs Orbit Explorer vs ML vs Q-Learning vs Raytracing)
+  // Workspace tab (Editor vs Orbit Explorer vs ML vs Q-Learning vs Raytracing)
   const [workspaceTab, setWorkspaceTab] = useState<
     'editor' | 'orbit' | 'ml' | 'qlearning' | 'raytracing'
   >('editor');
 
-  // ✅ Prevent hydration mismatch for responsive-based conditional rendering
+  // Prevent hydration mismatch for responsive-based conditional rendering
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
   const mobile = mounted ? isMobile : false;
   const desktop = mounted ? isDesktop : true;
+
+  // Lock body scroll when a full-screen mobile panel is open
+  useEffect(() => {
+    if (!mounted) return;
+    const anyMobileOverlayOpen = mobile && (showAIPanel || showContractPanel);
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = anyMobileOverlayOpen ? 'hidden' : '';
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [mounted, mobile, showAIPanel, showContractPanel]);
 
   useEffect(() => {
     if (abiData.abi) {
@@ -150,11 +161,21 @@ export default function HomePage() {
     }
   }, [abiData.abi]);
 
+  const compilationStatus = useMemo(() => {
+    if (isCompiling) return 'compiling';
+    if (output.some((o) => o.type === 'complete' && o.data.includes('successful'))) return 'success';
+    if (output.some((o) => o.type === 'error' || o.type === 'complete')) return 'error';
+    return 'idle';
+  }, [isCompiling, output]);
+
+  const canExportAbi = !!sessionId && compilationStatus === 'success' && !isExportingABI;
+  const canDeploy = !!sessionId && compilationStatus === 'success' && isConnected;
+
   const handleCompile = async () => {
-    // Compile the active tab's code
     if (!activeTab) return;
     await compile(activeTab.content, true);
-    // Show output panel after compilation, but respect mobile layout
+
+    // Show output panel after compilation (on mobile, avoid forcing if AI overlay is open)
     if (desktop || !showAIPanel) {
       setShowOutput(true);
     }
@@ -164,47 +185,59 @@ export default function HomePage() {
     handleCompile();
   };
 
-  // Keyboard shortcuts
   useKeyboardShortcuts({
-    onToggleAI: toggleAIPanel,
+    onToggleAI: () => {
+      if (mobile) {
+        setShowContractPanel(false);
+        toggleAIPanel(); 
+        return;
+      }
+  
+      toggleAIPanelCollapse();
+    },
     onToggleOutput: toggleOutput,
     onCompile: handleCompile,
-  });
+  });  
 
   const handleLoadTemplate = (templateId: string) => {
     const template = getTemplate(templateId);
     if (template) {
-      // Update active tab or create new one
       if (activeTab) {
         updateTabContent(activeTab.id, template.code);
       }
       clearOutput();
       setWorkspaceTab('editor');
+      // On mobile, ensure editor is visible (close overlays)
+      if (mobile) {
+        setShowAIPanel(false);
+        setShowContractPanel(false);
+      }
     }
   };
 
   const handleNewFile = (type: 'rust' | 'toml' | 'markdown') => {
-    const extensions = {
-      rust: '.rs',
-      toml: '.toml',
-      markdown: '.md',
-    };
-
-    const languages = {
-      rust: 'rust',
-      toml: 'toml',
-      markdown: 'markdown',
-    };
+    const extensions = { rust: '.rs', toml: '.toml', markdown: '.md' } as const;
+    const languages = { rust: 'rust', toml: 'toml', markdown: 'markdown' } as const;
 
     const count = tabs.filter((t) => t.name.includes(extensions[type])).length;
     const name = `new_file_${count + 1}${extensions[type]}`;
 
     addTab(name, '', languages[type]);
     setWorkspaceTab('editor');
+
+    if (mobile) {
+      setShowAIPanel(false);
+      setShowContractPanel(false);
+    }
   };
 
   const handleDeploySuccess = (contractAddress: string, txHash?: string) => {
     setDeployedContracts((prev) => [...prev, { address: contractAddress, txHash }]);
+    if (mobile) {
+      // After deploy, auto-open contract panel on mobile
+      setShowAIPanel(false);
+      setShowContractPanel(true);
+    }
   };
 
   const handleExportABI = async () => {
@@ -283,23 +316,41 @@ export default function HomePage() {
     }
   };
 
-  const compilationStatus = isCompiling
-    ? 'compiling'
-    : output.some((o) => o.type === 'complete' && o.data.includes('successful'))
-      ? 'success'
-      : output.some((o) => o.type === 'error' || o.type === 'complete')
-        ? 'error'
-        : 'idle';
+  // Mobile: keep overlays mutually exclusive
+  const handleToggleAI = () => {
+    if (mobile) {
+      setShowContractPanel(false);
+      setShowAIPanel(!showAIPanel);
+      return;
+    }
+    toggleAIPanelCollapse();
+  };
+
+  const handleToggleContract = () => {
+    if (mobile) {
+      setShowAIPanel(false);
+      setShowContractPanel(!showContractPanel);
+      return;
+    }
+    toggleContractPanelCollapse();
+  };
+
+  const closeMobilePanels = () => {
+    setShowAIPanel(false);
+    setShowContractPanel(false);
+  };
 
   return (
     <>
       <SetupGuide />
+
       <ABIDialog
         open={showABIDialog}
         onOpenChange={setShowABIDialog}
         abi={abiData.abi}
         solidity={abiData.solidity}
       />
+
       <DeployDialog
         open={showDeployDialog}
         onOpenChange={setShowDeployDialog}
@@ -308,21 +359,31 @@ export default function HomePage() {
       />
 
       <main className="h-screen flex flex-col bg-background">
-        {/* Header */}
-        <header className="h-14 border-b border-border flex items-center justify-between px-4">
-          <div className="text-lg md:text-xl font-bold text-primary">
-            <Link href="/" className="text-lg md:text-xl font-bold text-primary hover:opacity-80">
+        {/* Header (wraps on mobile, everything remains accessible via Actions menu) */}
+        <header className="border-b border-border px-3 py-2 md:px-4 md:py-0 md:h-14 flex items-center justify-between gap-2 flex-wrap">
+          <div className="min-w-0 flex items-center gap-2">
+            <Link
+              href="/"
+              className="text-lg md:text-xl font-bold text-primary hover:opacity-80 truncate"
+            >
               Stylus IDE
             </Link>
+            {/* Small status dot on mobile */}
+            <div className="md:hidden flex items-center gap-2">
+              {compilationStatus === 'success' && <CheckCircle2 className="h-4 w-4 text-green-400" />}
+              {compilationStatus === 'error' && <XCircle className="h-4 w-4 text-red-400" />}
+              {compilationStatus === 'compiling' && (
+                <span className="text-xs text-blue-400 animate-pulse">Compiling…</span>
+              )}
+            </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap justify-end">
             {/* Connect Wallet */}
             <ConnectButton />
-
             <FaucetButton />
 
-            {/* Compile Button */}
+            {/* Desktop / Tablet Actions */}
             <Button onClick={handleCompile} disabled={isCompiling} size="sm" className="hidden sm:flex">
               <Play className="h-4 w-4 mr-2" />
               {isCompiling ? 'Compiling...' : 'Compile'}
@@ -341,10 +402,10 @@ export default function HomePage() {
               </Button>
             )}
 
-            {/* Export ABI Button */}
+            {/* Export ABI */}
             <Button
               onClick={handleExportABI}
-              disabled={isExportingABI || !sessionId || compilationStatus !== 'success'}
+              disabled={!canExportAbi}
               size="sm"
               variant="outline"
               className="hidden sm:flex"
@@ -353,9 +414,10 @@ export default function HomePage() {
               {isExportingABI ? 'Exporting...' : 'Export ABI'}
             </Button>
 
+            {/* Deploy */}
             <Button
               onClick={() => setShowDeployDialog(true)}
-              disabled={!isConnected || !sessionId || compilationStatus !== 'success'}
+              disabled={!canDeploy}
               size="sm"
               className="hidden sm:flex"
             >
@@ -363,7 +425,7 @@ export default function HomePage() {
               Deploy
             </Button>
 
-            {/* Templates Dropdown */}
+            {/* Templates Dropdown (desktop/tablet) */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="outline" size="sm" className="hidden md:flex">
@@ -373,13 +435,52 @@ export default function HomePage() {
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
                 {templates.map((template) => (
-                  <DropdownMenuItem
-                    key={template.id}
-                    onClick={() => handleLoadTemplate(template.id)}
-                  >
+                  <DropdownMenuItem key={template.id} onClick={() => handleLoadTemplate(template.id)}>
                     <div>
                       <div className="font-medium">{template.name}</div>
                       <div className="text-xs text-muted-foreground">{template.description}</div>
+                    </div>
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            {/* Mobile Actions Menu (NO FEATURE LOSS) */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="icon" className="sm:hidden" aria-label="Actions">
+                  <MoreVertical className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-72">
+                <DropdownMenuItem onClick={handleCompile} disabled={isCompiling || !activeTab}>
+                  <Play className="h-4 w-4 mr-2" />
+                  {isCompiling ? 'Compiling...' : 'Compile'}
+                </DropdownMenuItem>
+
+                <DropdownMenuItem onClick={handleExportABI} disabled={!canExportAbi}>
+                  <Download className="h-4 w-4 mr-2" />
+                  {isExportingABI ? 'Exporting ABI…' : 'Export ABI'}
+                </DropdownMenuItem>
+
+                <DropdownMenuItem onClick={() => setShowDeployDialog(true)} disabled={!canDeploy}>
+                  <Upload className="h-4 w-4 mr-2" />
+                  Deploy
+                </DropdownMenuItem>
+
+                {abiData.abi && (
+                  <DropdownMenuItem onClick={() => setShowBenchmarkDialog(true)}>
+                    <Zap className="h-4 w-4 mr-2" />
+                    Benchmark Orbit
+                  </DropdownMenuItem>
+                )}
+
+                <div className="px-2 py-1.5 text-xs text-muted-foreground">Templates</div>
+                {templates.map((template) => (
+                  <DropdownMenuItem key={template.id} onClick={() => handleLoadTemplate(template.id)}>
+                    <div className="min-w-0">
+                      <div className="font-medium truncate">{template.name}</div>
+                      <div className="text-xs text-muted-foreground truncate">{template.description}</div>
                     </div>
                   </DropdownMenuItem>
                 ))}
@@ -393,7 +494,9 @@ export default function HomePage() {
               className="focus-visible-ring"
               onClick={() => {
                 if (mobile) {
-                  toggleAIPanel();
+                  // full-screen overlay on mobile
+                  setShowContractPanel(false);
+                  setShowAIPanel(!showAIPanel);
                 } else {
                   toggleAIPanelCollapse();
                 }
@@ -427,7 +530,8 @@ export default function HomePage() {
               className="focus-visible-ring"
               onClick={() => {
                 if (mobile) {
-                  toggleContractPanel();
+                  setShowAIPanel(false);
+                  setShowContractPanel(!showContractPanel);
                 } else {
                   toggleContractPanelCollapse();
                 }
@@ -456,13 +560,13 @@ export default function HomePage() {
           </div>
         </header>
 
-        {/* ✅ Workspace Tabs Bar (Editor / Orbit Explorer / ML / Q-Learning / Raytracing) */}
-        <div className="h-10 border-b border-border bg-card flex items-center px-4 gap-2">
+        {/* Workspace Tabs Bar (scrollable on mobile) */}
+        <div className="h-10 border-b border-border bg-card flex items-center px-2 sm:px-4 gap-2 overflow-x-auto whitespace-nowrap">
           <Button
             size="sm"
             variant={workspaceTab === 'editor' ? 'secondary' : 'ghost'}
             onClick={() => setWorkspaceTab('editor')}
-            className="h-7"
+            className="h-7 shrink-0"
           >
             Editor
           </Button>
@@ -470,7 +574,7 @@ export default function HomePage() {
             size="sm"
             variant={workspaceTab === 'orbit' ? 'secondary' : 'ghost'}
             onClick={() => setWorkspaceTab('orbit')}
-            className="h-7"
+            className="h-7 shrink-0"
           >
             Orbit Explorer
           </Button>
@@ -478,15 +582,15 @@ export default function HomePage() {
             size="sm"
             variant={workspaceTab === 'ml' ? 'secondary' : 'ghost'}
             onClick={() => setWorkspaceTab('ml')}
-            className="h-7"
+            className="h-7 shrink-0"
           >
-            On-chain ML Inference
+            On-chain ML
           </Button>
           <Button
             size="sm"
             variant={workspaceTab === 'qlearning' ? 'secondary' : 'ghost'}
             onClick={() => setWorkspaceTab('qlearning')}
-            className="h-7"
+            className="h-7 shrink-0"
           >
             Q-Learning
           </Button>
@@ -494,7 +598,7 @@ export default function HomePage() {
             size="sm"
             variant={workspaceTab === 'raytracing' ? 'secondary' : 'ghost'}
             onClick={() => setWorkspaceTab('raytracing')}
-            className="h-7"
+            className="h-7 shrink-0"
           >
             Raytracing
           </Button>
@@ -504,25 +608,22 @@ export default function HomePage() {
         <div className="flex-1 flex flex-col lg:flex-row overflow-hidden">
           {/* Primary Content Area */}
           <div className="flex-1 flex flex-col min-w-0 relative">
-            {/* ✅ Orbit Explorer Tab */}
+            {/* Orbit Explorer */}
             {workspaceTab === 'orbit' ? (
               <section className="flex-1 min-h-0 overflow-auto bg-muted/30">
-                <div className="p-4 sm:p-6">
+                <div className="p-3 sm:p-6">
                   <OrbitExplorer />
                 </div>
               </section>
             ) : workspaceTab === 'ml' ? (
-              // ✅ ML Tab: embed /ml-demo as a tab view
               <section className="flex-1 min-h-0 bg-background">
                 <iframe title="On-chain ML Inference" src="/ml" className="w-full h-full border-0" />
               </section>
             ) : workspaceTab === 'qlearning' ? (
-              // ✅ Q-Learning Tab: embed /qlearning as a tab view
               <section className="flex-1 min-h-0 bg-background">
                 <iframe title="Q-Learning" src="/qlearning" className="w-full h-full border-0" />
               </section>
             ) : workspaceTab === 'raytracing' ? (
-              // ✅ Raytracing Tab: embed /raytracing as a tab view
               <section className="flex-1 min-h-0 bg-background">
                 <iframe title="Raytracing" src="/raytracing" className="w-full h-full border-0" />
               </section>
@@ -541,24 +642,35 @@ export default function HomePage() {
                   />
 
                   {/* Active Tab Toolbar */}
-                  <div className="h-10 border-b border-border flex items-center justify-between px-4 gap-2">
+                  <div className="h-10 border-b border-border flex items-center justify-between px-2 sm:px-4 gap-2">
                     <div className="flex items-center gap-2 overflow-x-auto">
-                      <span className="text-xs text-muted-foreground">
+                      <span className="text-xs text-muted-foreground shrink-0">
                         {tabs.length} file{tabs.length !== 1 ? 's' : ''}
                       </span>
+
                       {errors.length > 0 && (
-                        <span className="text-xs bg-red-500/20 text-red-400 px-2 py-0.5 rounded-full">
+                        <span className="text-xs bg-red-500/20 text-red-400 px-2 py-0.5 rounded-full shrink-0">
                           {errors.length} {errors.length === 1 ? 'error' : 'errors'}
+                        </span>
+                      )}
+
+                      {compilationTime !== null && (
+                        <span className="hidden sm:flex text-xs text-muted-foreground items-center gap-1 shrink-0">
+                          <Clock className="h-3 w-3" />
+                          {formatCompilationTime(compilationTime)}
                         </span>
                       )}
                     </div>
 
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 shrink-0">
+                      {/* Mobile quick compile */}
                       <Button
                         onClick={handleCompile}
                         disabled={isCompiling || !activeTab}
                         size="sm"
                         className="sm:hidden h-7"
+                        aria-label="Compile"
+                        title="Compile"
                       >
                         <Play className="h-3 w-3" />
                       </Button>
@@ -577,11 +689,7 @@ export default function HomePage() {
                   </div>
 
                   {/* Monaco Editor */}
-                  <div
-                    className={`flex-1 bg-card transition-all duration-300 ${
-                      showOutput ? 'min-h-0' : 'min-h-0'
-                    }`}
-                  >
+                  <div className="flex-1 bg-card transition-all duration-300 min-h-0">
                     {activeTab ? (
                       <MonacoEditor
                         key={activeTab.id}
@@ -599,22 +707,18 @@ export default function HomePage() {
                   </div>
                 </section>
 
-                {/* Bottom Panel - Output (Responsive) */}
+                {/* Bottom Panel - Output (responsive) */}
                 <section
                   className={`
                     border-t border-border flex flex-col bg-card
                     transition-all duration-300 ease-in-out
-                    ${showOutput ? 'h-32 sm:h-40 md:h-48 lg:h-56 xl:h-64' : 'h-10 sm:h-12'}
+                    ${showOutput ? 'h-40 sm:h-48 md:h-56 xl:h-64' : 'h-12'}
                   `}
                 >
-                  <div
-                    className={`${
-                      showOutput ? 'h-10 sm:h-12' : 'h-10 sm:h-12'
-                    } border-b border-border flex items-center justify-between px-4`}
-                  >
-                    <div className="flex items-center gap-2 sm:gap-3 overflow-x-auto">
+                  <div className="h-12 border-b border-border flex items-center justify-between px-2 sm:px-4">
+                    <div className="flex items-center gap-2 sm:gap-3 overflow-x-auto min-w-0">
                       <button
-                        className="text-sm font-medium cursor-pointer flex items-center gap-2 hover:text-primary transition-colors"
+                        className="text-sm font-medium cursor-pointer flex items-center gap-2 hover:text-primary transition-colors shrink-0"
                         onClick={toggleOutput}
                         aria-label={showOutput ? 'Hide output panel' : 'Show output panel'}
                       >
@@ -623,43 +727,42 @@ export default function HomePage() {
                         {compilationStatus === 'success' && (
                           <CheckCircle2 className="h-4 w-4 text-green-400" />
                         )}
-                        {compilationStatus === 'error' && (
-                          <XCircle className="h-4 w-4 text-red-400" />
-                        )}
+                        {compilationStatus === 'error' && <XCircle className="h-4 w-4 text-red-400" />}
                       </button>
 
                       {output.length > 0 && (
-                        <span className="text-xs bg-primary/20 text-primary px-2 py-0.5 rounded-full">
+                        <span className="text-xs bg-primary/20 text-primary px-2 py-0.5 rounded-full shrink-0">
                           {output.length}
                         </span>
                       )}
 
                       {compilationTime !== null && (
-                        <span className="hidden sm:flex text-xs text-muted-foreground items-center gap-1">
+                        <span className="hidden sm:flex text-xs text-muted-foreground items-center gap-1 shrink-0">
                           <Clock className="h-3 w-3" />
                           {formatCompilationTime(compilationTime)}
                         </span>
                       )}
                     </div>
 
-                    <div className="flex items-center gap-1 sm:gap-2">
+                    <div className="flex items-center gap-1 sm:gap-2 shrink-0">
                       {output.length > 0 && (
                         <Button
                           variant="ghost"
                           size="sm"
                           onClick={clearOutput}
-                          className="h-7 sm:h-8 px-2 sm:px-3"
+                          className="h-8 px-2 sm:px-3"
                           aria-label="Clear output"
                         >
                           <Trash2 className="h-3 w-3 sm:mr-1" />
                           <span className="hidden sm:inline">Clear</span>
                         </Button>
                       )}
+
                       <Button
                         variant="ghost"
                         size="sm"
                         onClick={toggleOutput}
-                        className="h-7 sm:h-8 px-2"
+                        className="h-8 px-2"
                         aria-label={showOutput ? 'Collapse output' : 'Expand output'}
                       >
                         {showOutput ? '−' : '+'}
@@ -670,18 +773,13 @@ export default function HomePage() {
                   {showOutput && (
                     <div className="flex-1 overflow-auto p-2 sm:p-4 min-h-0 font-mono text-xs space-y-1 custom-scrollbar">
                       {output.length === 0 && !isCompiling && (
-                        <p className="text-muted-foreground">
-                          Ready to compile. Press Compile or Cmd/Ctrl+S
-                        </p>
+                        <p className="text-muted-foreground">Ready to compile. Press Compile or Cmd/Ctrl+S</p>
                       )}
                       {isCompiling && output.length === 0 && (
                         <p className="text-blue-400 animate-pulse">Starting compilation...</p>
                       )}
                       {output.map((item, index) => (
-                        <div
-                          key={index}
-                          className={`flex items-start gap-2 ${getOutputColor(item.type)}`}
-                        >
+                        <div key={index} className={`flex items-start gap-2 ${getOutputColor(item.type)}`}>
                           {getOutputIcon(item.type)}
                           <span className="flex-1 whitespace-pre-wrap break-anywhere">
                             {stripAnsiCodes(item.data)}
@@ -706,19 +804,13 @@ export default function HomePage() {
                     ? 'lg:w-0 lg:min-w-0 lg:max-w-0 lg:overflow-hidden'
                     : 'lg:w-96 lg:max-w-100 lg:min-w-[320px]'
                 }
-                border-l border-border bg-card
-                flex flex-col
+                border-l border-border bg-card flex flex-col
               `}
             >
               {/* Mobile Header */}
               <div className="lg:hidden h-14 border-b border-border flex items-center justify-between px-4 bg-card/95 backdrop-blur-sm">
                 <span className="font-semibold">AI Assistant</span>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => setShowAIPanel(false)}
-                  aria-label="Close AI panel"
-                >
+                <Button variant="ghost" size="icon" onClick={() => setShowAIPanel(false)} aria-label="Close AI panel">
                   <X className="h-5 w-5" />
                 </Button>
               </div>
@@ -729,9 +821,7 @@ export default function HomePage() {
                   currentCode={activeTab?.content}
                   compilationErrors={errors}
                   onInsertCode={(code) => {
-                    if (activeTab) {
-                      updateTabContent(activeTab.id, code);
-                    }
+                    if (activeTab) updateTabContent(activeTab.id, code);
                   }}
                 />
               </div>
@@ -749,8 +839,7 @@ export default function HomePage() {
                     ? 'lg:w-0 lg:min-w-0 lg:max-w-0 lg:overflow-hidden'
                     : 'lg:w-96 lg:max-w-100 lg:min-w-[320px]'
                 }
-                border-l border-border bg-card
-                flex flex-col
+                border-l border-border bg-card flex flex-col
               `}
             >
               {/* Mobile Header */}
@@ -784,10 +873,7 @@ export default function HomePage() {
           {(showAIPanel || showContractPanel) && (
             <div
               className="fixed inset-0 bg-background/80 panel-overlay z-40 lg:hidden"
-              onClick={() => {
-                setShowAIPanel(false);
-                setShowContractPanel(false);
-              }}
+              onClick={closeMobilePanels}
               aria-label="Close panel"
             />
           )}

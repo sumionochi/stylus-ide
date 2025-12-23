@@ -1,9 +1,11 @@
 {
     "cSpell.words": [
         "apechain",
+        "cdylib",
         "Celestia",
         "Chainlink",
         "Chainlist",
+        "codegen",
         "numpy",
         "QLEARNING",
         "scikit",

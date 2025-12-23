@@ -53,17 +53,6 @@ export default function QLearningDemoPage() {
 
   return (
     <main className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="h-14 border-b border-border flex items-center justify-between px-4">
-        <div className="flex items-center gap-4">
-          <Link href="/" className="flex items-center gap-2 text-lg font-bold text-primary hover:opacity-80">
-            <ArrowLeft className="h-4 w-4" />
-            Stylus IDE
-          </Link>
-          <span className="text-sm text-muted-foreground hidden sm:inline">→ Q-Learning Demo</span>
-        </div>
-        <ConnectButton />
-      </header>
 
       <div className="container mx-auto p-6 max-w-7xl">
         {/* Title */}
