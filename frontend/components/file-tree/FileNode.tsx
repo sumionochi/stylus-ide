@@ -8,7 +8,7 @@ interface FileNodeProps {
   node: FileNodeType;
   isActive: boolean;
   onClick: () => void;
-  onContextMenu: (e: React.MouseEvent, node: FileNodeType) => void;
+  onContextMenu: () => void;  // Keep this prop
   depth: number;
 }
 
@@ -19,7 +19,7 @@ export function FileNode({
   onContextMenu,
   depth,
 }: FileNodeProps) {
-  const paddingLeft = depth * 12 + 8; // Indent based on depth
+  const paddingLeft = depth * 12 + 8;
 
   const getFileIcon = () => {
     const name = node.name.toLowerCase();
@@ -48,7 +48,10 @@ export function FileNode({
       )}
       style={{ paddingLeft: `${paddingLeft}px` }}
       onClick={onClick}
-      onContextMenu={(e) => onContextMenu(e, node)}
+      onContextMenu={(e) => {
+        e.stopPropagation();
+        onContextMenu();
+      }}
     >
       {getFileIcon()}
       <span className="truncate">{node.name}</span>

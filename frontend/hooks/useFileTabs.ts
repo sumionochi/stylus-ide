@@ -6,92 +6,160 @@ export interface FileTab {
   id: string;
   name: string;
   content: string;
-  language: string;
-  isModified: boolean;
+  language: "rust" | "toml" | "markdown" | "text" | "gitignore";
+  path: string; // NEW - Full path for multi-file support
+  modified: boolean; // NEW - Track if file has unsaved changes
 }
 
 interface UseFileTabsReturn {
   tabs: FileTab[];
   activeTabId: string | null;
-  activeTab: FileTab | null;
-  addTab: (name: string, content: string, language?: string) => string;
+  activeTab: FileTab | undefined;
+  addTab: (
+    name: string,
+    content: string,
+    language: FileTab["language"],
+    path?: string
+  ) => string;
   removeTab: (id: string) => void;
   updateTabContent: (id: string, content: string) => void;
   setActiveTab: (id: string) => void;
   renameTab: (id: string, newName: string) => void;
-  getTabsCode: () => Record<string, string>;
+  getTabByPath: (path: string) => FileTab | undefined;
+  openOrActivateTab: (
+    path: string,
+    name: string,
+    content: string,
+    language: FileTab["language"]
+  ) => void;
+  markTabSaved: (id: string) => void;
+  closeTabByPath: (path: string) => void;
 }
 
-export function useFileTabs(initialContent?: string): UseFileTabsReturn {
+export function useFileTabs(defaultContent: string = ""): UseFileTabsReturn {
   const [tabs, setTabs] = useState<FileTab[]>([
     {
-      id: "main",
+      id: "default",
       name: "lib.rs",
-      content: initialContent || "",
+      content: defaultContent,
       language: "rust",
-      isModified: false,
+      path: "src/lib.rs",
+      modified: false,
     },
   ]);
-  const [activeTabId, setActiveTabId] = useState<string>("main");
+  const [activeTabId, setActiveTabId] = useState<string | null>("default");
 
-  const activeTab = tabs.find((tab) => tab.id === activeTabId) || null;
+  const activeTab = tabs.find((tab) => tab.id === activeTabId);
 
+  // Add a new tab
   const addTab = useCallback(
-    (name: string, content: string = "", language: string = "rust"): string => {
-      const id = `tab-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    (
+      name: string,
+      content: string,
+      language: FileTab["language"],
+      path?: string
+    ): string => {
       const newTab: FileTab = {
-        id,
+        id: `tab-${Date.now()}-${Math.random()}`,
         name,
         content,
         language,
-        isModified: false,
+        path: path || name,
+        modified: false,
       };
 
       setTabs((prev) => [...prev, newTab]);
-      setActiveTabId(id);
-      return id;
+      setActiveTabId(newTab.id);
+      return newTab.id;
     },
     []
   );
 
-  const removeTab = useCallback(
-    (id: string) => {
-      setTabs((prev) => {
-        const newTabs = prev.filter((tab) => tab.id !== id);
+  // Remove a tab
+  const removeTab = useCallback((id: string) => {
+    setTabs((prev) => {
+      const filtered = prev.filter((tab) => tab.id !== id);
 
-        // If removing active tab, switch to another
-        if (id === activeTabId && newTabs.length > 0) {
-          const index = prev.findIndex((tab) => tab.id === id);
-          const newActiveIndex = index > 0 ? index - 1 : 0;
-          setActiveTabId(newTabs[newActiveIndex].id);
+      // If we removed the active tab, activate another one
+      setActiveTabId((currentActive) => {
+        if (currentActive === id) {
+          return filtered.length > 0 ? filtered[filtered.length - 1].id : null;
         }
-
-        return newTabs.length > 0 ? newTabs : prev; // Keep at least one tab
+        return currentActive;
       });
-    },
-    [activeTabId]
-  );
 
+      return filtered;
+    });
+  }, []);
+
+  // Update tab content
   const updateTabContent = useCallback((id: string, content: string) => {
     setTabs((prev) =>
       prev.map((tab) =>
-        tab.id === id ? { ...tab, content, isModified: true } : tab
+        tab.id === id ? { ...tab, content, modified: true } : tab
       )
     );
   }, []);
 
+  // Set active tab
+  const setActiveTab = useCallback((id: string) => {
+    setActiveTabId(id);
+  }, []);
+
+  // Rename a tab
   const renameTab = useCallback((id: string, newName: string) => {
     setTabs((prev) =>
       prev.map((tab) => (tab.id === id ? { ...tab, name: newName } : tab))
     );
   }, []);
 
-  const getTabsCode = useCallback((): Record<string, string> => {
-    return tabs.reduce((acc, tab) => {
-      acc[tab.name] = tab.content;
-      return acc;
-    }, {} as Record<string, string>);
-  }, [tabs]);
+  // Get tab by path (for file tree integration)
+  const getTabByPath = useCallback(
+    (path: string): FileTab | undefined => {
+      return tabs.find((tab) => tab.path === path);
+    },
+    [tabs]
+  );
+
+  // Open or activate existing tab (key function for file tree)
+  const openOrActivateTab = useCallback(
+    (
+      path: string,
+      name: string,
+      content: string,
+      language: FileTab["language"]
+    ) => {
+      const existingTab = tabs.find((tab) => tab.path === path);
+
+      if (existingTab) {
+        // Tab already open, just activate it
+        setActiveTabId(existingTab.id);
+      } else {
+        // Open new tab
+        const newTabId = addTab(name, content, language, path);
+        setActiveTabId(newTabId);
+      }
+    },
+    [tabs, addTab]
+  );
+
+  // Mark tab as saved (remove modified flag)
+  const markTabSaved = useCallback((id: string) => {
+    setTabs((prev) =>
+      prev.map((tab) => (tab.id === id ? { ...tab, modified: false } : tab))
+    );
+  }, []);
+
+  // Close tab by path (for file tree integration)
+  const closeTabByPath = useCallback(
+    (path: string) => {
+      const tab = tabs.find((t) => t.path === path);
+      if (tab) {
+        removeTab(tab.id);
+      }
+    },
+    [tabs, removeTab]
+  );
 
   return {
     tabs,
@@ -100,8 +168,11 @@ export function useFileTabs(initialContent?: string): UseFileTabsReturn {
     addTab,
     removeTab,
     updateTabContent,
-    setActiveTab: setActiveTabId,
+    setActiveTab,
     renameTab,
-    getTabsCode,
+    getTabByPath,
+    openOrActivateTab,
+    markTabSaved,
+    closeTabByPath,
   };
 }

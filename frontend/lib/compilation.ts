@@ -1,4 +1,3 @@
-//compilations.ts
 import { spawn } from "child_process";
 import { COMPILATION_CONSTANTS, ERROR_MESSAGES } from "./constants";
 import { createProjectStructure, writeProjectFiles } from "./file-utils";
@@ -23,6 +22,12 @@ export interface CompilationResult {
   output: CompilationOutput[];
   wasmSize?: number;
   error?: string;
+}
+
+// NEW: Project file interface
+export interface ProjectFile {
+  path: string;
+  content: string;
 }
 
 function stripAnsi(input: string) {
@@ -82,25 +87,113 @@ async function getWasmSize(projectPath: string): Promise<number | null> {
   }
 }
 
+// NEW: Write multiple project files
+async function writeMultipleProjectFiles(
+  projectPath: string,
+  projectFiles: ProjectFile[]
+): Promise<void> {
+  for (const file of projectFiles) {
+    const filePath = path.join(projectPath, file.path);
+
+    // Create directory if needed
+    const fileDir = path.dirname(filePath);
+    await fs.mkdir(fileDir, { recursive: true });
+
+    // Write file
+    await fs.writeFile(filePath, file.content, "utf-8");
+  }
+}
+
+// NEW: Check if files include Cargo.toml
+function hasCargoToml(files: ProjectFile[]): boolean {
+  return files.some(
+    (f) => f.path === "Cargo.toml" || f.path === "./Cargo.toml"
+  );
+}
+
+// NEW: Check if files include rust-toolchain.toml
+function hasRustToolchain(files: ProjectFile[]): boolean {
+  return files.some(
+    (f) =>
+      f.path === "rust-toolchain.toml" || f.path === "./rust-toolchain.toml"
+  );
+}
+
 export async function runCargoStylusCheck(
   projectPath: string,
   code: string,
-  onOutput?: (output: CompilationOutput) => void
+  onOutput?: (output: CompilationOutput) => void,
+  projectFiles?: ProjectFile[] // NEW: Optional multi-file support
 ): Promise<CompilationResult> {
   try {
     // STEP 1: Create project structure
     const { srcPath } = await createProjectStructure(projectPath);
 
-    // STEP 2: Write project files (Cargo.toml + rust-toolchain.toml + src/lib.rs + src/main.rs)
-    await writeProjectFiles(
-      projectPath,
-      srcPath,
-      code,
-      CARGO_TOML_TEMPLATE,
-      RUST_TOOLCHAIN_TOML,
-      MAIN_RS_TEMPLATE,
-      GITIGNORE_TEMPLATE
-    );
+    // STEP 2: Write project files
+    if (projectFiles && projectFiles.length > 0) {
+      // NEW: Multi-file mode
+      await writeMultipleProjectFiles(projectPath, projectFiles);
+
+      // Add default files if not provided
+      if (!hasCargoToml(projectFiles)) {
+        await fs.writeFile(
+          path.join(projectPath, "Cargo.toml"),
+          CARGO_TOML_TEMPLATE,
+          "utf-8"
+        );
+      }
+
+      if (!hasRustToolchain(projectFiles)) {
+        await fs.writeFile(
+          path.join(projectPath, "rust-toolchain.toml"),
+          RUST_TOOLCHAIN_TOML,
+          "utf-8"
+        );
+      }
+
+      // Add .gitignore if not provided
+      const hasGitignore = projectFiles.some(
+        (f) => f.path === ".gitignore" || f.path === "./.gitignore"
+      );
+      if (!hasGitignore) {
+        await fs.writeFile(
+          path.join(projectPath, ".gitignore"),
+          GITIGNORE_TEMPLATE,
+          "utf-8"
+        );
+      }
+
+      // Add main.rs if not provided
+      const hasMainRs = projectFiles.some(
+        (f) => f.path === "src/main.rs" || f.path === "./src/main.rs"
+      );
+      if (!hasMainRs) {
+        await fs.writeFile(
+          path.join(srcPath, "main.rs"),
+          MAIN_RS_TEMPLATE,
+          "utf-8"
+        );
+      }
+
+      // Send output message about file count
+      const fileCountMsg: CompilationOutput = {
+        type: "stdout",
+        data: `📁 Compiling project with ${projectFiles.length} file(s)`,
+        timestamp: 0,
+      };
+      onOutput?.(fileCountMsg);
+    } else {
+      // Legacy single-file mode (backward compatible)
+      await writeProjectFiles(
+        projectPath,
+        srcPath,
+        code,
+        CARGO_TOML_TEMPLATE,
+        RUST_TOOLCHAIN_TOML,
+        MAIN_RS_TEMPLATE,
+        GITIGNORE_TEMPLATE
+      );
+    }
 
     // STEP 3: Ensure wasm target exists for the pinned toolchain
     const wasmInstalled = await installWasmTarget(projectPath);
@@ -282,12 +375,6 @@ export function parseCompilationErrors(stderr: string): {
   return errors;
 }
 
-export interface CompilationOutput {
-  type: "stdout" | "stderr" | "error" | "complete" | "result";
-  data: string;
-  timestamp?: number;
-}
-
 type RunResult = {
   code: number;
   stdout: string;
@@ -372,7 +459,7 @@ export async function exportContractABI(
 ): Promise<{
   success: boolean;
   solidity?: string;
-  abi?: string; // ✅ JSON ABI (prettified)
+  abi?: string;
   error?: string;
   details?: string;
 }> {

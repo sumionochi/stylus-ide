@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { ProjectState, FileNode } from "@/types/project";
 import {
   createProject,
@@ -14,11 +14,53 @@ import {
   toggleFileOpen,
   getFileByPath,
 } from "@/lib/project-manager";
+import { saveProject, loadProject } from "@/lib/storage"; // NEW
 
 export function useProjectState(initialName: string = "my-stylus-project") {
-  const [project, setProject] = useState<ProjectState>(() =>
-    createProject(initialName)
-  );
+  // NEW: Load from localStorage or create new project
+  const [project, setProject] = useState<ProjectState>(() => {
+    if (typeof window !== "undefined") {
+      const savedProject = loadProject();
+      if (savedProject) {
+        return savedProject;
+      }
+    }
+    return createProject(initialName);
+  });
+
+  const saveTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const lastSaveRef = useRef<string>("");
+
+  // NEW: Auto-save effect
+  useEffect(() => {
+    // Skip if running on server
+    if (typeof window === "undefined") return;
+
+    // Serialize project for comparison
+    const projectSnapshot = JSON.stringify(project);
+
+    // Only save if project actually changed
+    if (projectSnapshot !== lastSaveRef.current) {
+      // Clear existing timer
+      if (saveTimerRef.current) {
+        clearTimeout(saveTimerRef.current);
+      }
+
+      // Set new timer (debounce for 2 seconds)
+      saveTimerRef.current = setTimeout(() => {
+        saveProject(project);
+        lastSaveRef.current = projectSnapshot;
+        console.log("Project auto-saved");
+      }, 2000);
+    }
+
+    // Cleanup on unmount
+    return () => {
+      if (saveTimerRef.current) {
+        clearTimeout(saveTimerRef.current);
+      }
+    };
+  }, [project]);
 
   // Create new file
   const createNewFile = useCallback((path: string, content?: string) => {
@@ -85,7 +127,6 @@ export function useProjectState(initialName: string = "my-stylus-project") {
     setProject((prev) => {
       let updated = setActiveFile(prev, path);
 
-      // Also mark file as open if setting active
       if (path) {
         updated = toggleFileOpen(updated, path, true);
       }
@@ -99,7 +140,6 @@ export function useProjectState(initialName: string = "my-stylus-project") {
     setProject((prev) => {
       let updated = toggleFileOpen(prev, path, false);
 
-      // If closing active file, set active to null
       if (prev.activeFilePath === path) {
         updated = setActiveFile(updated, null);
       }
@@ -116,6 +156,49 @@ export function useProjectState(initialName: string = "my-stylus-project") {
     }));
   }, []);
 
+  // Duplicate file
+  const duplicateFile = useCallback((path: string) => {
+    try {
+      setProject((prev) => {
+        const file = getFileByPath(prev, path);
+        if (!file) {
+          console.error("File not found:", path);
+          return prev;
+        }
+
+        const pathParts = path.split("/");
+        const fileName = pathParts.pop()!;
+        const fileDir = pathParts.join("/");
+
+        const nameParts = fileName.split(".");
+        const ext = nameParts.length > 1 ? nameParts.pop() : "";
+        const baseName = nameParts.join(".");
+
+        let counter = 1;
+        let newName = ext ? `${baseName}_copy.${ext}` : `${baseName}_copy`;
+        let newPath = fileDir ? `${fileDir}/${newName}` : newName;
+
+        while (getFileByPath(prev, newPath)) {
+          counter++;
+          newName = ext
+            ? `${baseName}_copy${counter}.${ext}`
+            : `${baseName}_copy${counter}`;
+          newPath = fileDir ? `${fileDir}/${newName}` : newName;
+        }
+
+        return addFile(prev, {
+          path: newPath,
+          content: file.content,
+        });
+      });
+
+      return true;
+    } catch (error) {
+      console.error("Failed to duplicate file:", error);
+      return false;
+    }
+  }, []);
+
   // Get current file content
   const getCurrentFile = useCallback(() => {
     if (!project.activeFilePath) return null;
@@ -126,6 +209,19 @@ export function useProjectState(initialName: string = "my-stylus-project") {
   const getOpenFiles = useCallback(() => {
     return project.files.filter((f) => f.isOpen);
   }, [project.files]);
+
+  // NEW: Manual save function
+  const manualSave = useCallback(() => {
+    saveProject(project);
+    console.log("Project manually saved");
+  }, [project]);
+
+  // NEW: Reset to new project
+  const resetProject = useCallback(() => {
+    const newProject = createProject(initialName);
+    setProject(newProject);
+    saveProject(newProject);
+  }, [initialName]);
 
   return {
     project,
@@ -139,8 +235,11 @@ export function useProjectState(initialName: string = "my-stylus-project") {
     setActive,
     closeFile,
     toggleFolder,
+    duplicateFile,
     getCurrentFile,
     getOpenFiles,
+    manualSave, // NEW
+    resetProject, // NEW
   };
 }
 

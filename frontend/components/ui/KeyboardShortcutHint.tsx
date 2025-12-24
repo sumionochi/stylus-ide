@@ -62,7 +62,7 @@ export function KeyboardShortcutHint() {
                 <Button
                     variant="ghost"
                     size="icon"
-                    className="fixed bottom-4 right-4 z-40 h-10 w-10 rounded-full bg-card border border-border shadow-lg hover:shadow-xl transition-all"
+                    className="fixed bottom-10 right-10 z-40 h-10 w-10 rounded-full bg-card border border-border shadow-lg hover:shadow-xl transition-all"
                     onClick={() => setShowHint(true)}
                     title="Show keyboard shortcuts"
                 >

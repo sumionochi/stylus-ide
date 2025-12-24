@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { FileNode as FileNodeType } from '@/types/project';
 import { ChevronRight, ChevronDown, Folder, FolderOpen } from 'lucide-react';
 import { FileNode } from './FileNode';
+import { FileTreeContextMenu } from './ContextMenu';
 import { cn } from '@/lib/utils';
 
 interface FolderNodeProps {
@@ -11,7 +12,7 @@ interface FolderNodeProps {
   activeFilePath: string | null;
   onFileClick: (path: string) => void;
   onFolderToggle: (path: string, expanded: boolean) => void;
-  onContextMenu: (e: React.MouseEvent, node: FileNodeType) => void;
+  onContextMenu: () => void;
   depth: number;
 }
 
@@ -45,7 +46,10 @@ export function FolderNode({
         )}
         style={{ paddingLeft: `${paddingLeft}px` }}
         onClick={handleToggle}
-        onContextMenu={(e) => onContextMenu(e, node)}
+        onContextMenu={(e) => {
+          e.stopPropagation();
+          onContextMenu();
+        }}
       >
         {/* Chevron */}
         <div className="flex items-center justify-center w-4 h-4">

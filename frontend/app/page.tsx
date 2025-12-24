@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   AlertTriangle,
   Bot,
@@ -40,6 +40,12 @@ import { ChatPanel } from '@/components/ai/ChatPanel';
 import { KeyboardShortcutHint } from '@/components/ui/KeyboardShortcutHint';
 import { BenchmarkDialog } from '@/components/orbit/BenchmarkDialog';
 import { OrbitExplorer } from '@/components/orbit/OrbitExplorer';
+import { ProjectActions } from '@/components/project/ProjectActions';
+
+// NEW IMPORTS FOR MULTI-FILE SUPPORT
+import { FileTree } from '@/components/file-tree/FileTree';
+import { useProjectState } from '@/hooks/useProjectState';
+import { getFileByPath } from '@/lib/project-manager';
 
 import { templates, getTemplate } from '@/lib/templates';
 import { stripAnsiCodes, formatCompilationTime } from '@/lib/output-formatter';
@@ -48,8 +54,9 @@ import { useFileTabs } from '@/hooks/useFileTabs';
 import { usePanelState } from '@/hooks/usePanelState';
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
 import { useResponsive } from '@/hooks/useResponsive';
+import { ProjectState } from '@/types/project';
 
-const DEFAULT_CODE = `// Welcome to Stylus IDE
+const DEFAULT_CODE = `// Welcome to Stylus IDE - Multi-File Project
 
 #![cfg_attr(not(feature = "export-abi"), no_main)]
 extern crate alloc;
@@ -59,19 +66,20 @@ use stylus_sdk::alloy_primitives::U256;
 
 sol_storage! {
   #[entrypoint]
-  pub struct MyContract {
-    uint256 value;
+  pub struct Counter {
+    uint256 count;
   }
 }
 
 #[public]
-impl MyContract {
-  pub fn get_value(&self) -> U256 {
-    self.value.get()
+impl Counter {
+  pub fn get(&self) -> U256 {
+    self.count.get()
   }
 
-  pub fn set_value(&mut self, new_value: U256) {
-    self.value.set(new_value);
+  pub fn increment(&mut self) {
+    let count = self.count.get();
+    self.count.set(count + U256::from(1));
   }
 }
 `;
@@ -95,6 +103,24 @@ export default function HomePage() {
 
   const { isMobile, isDesktop } = useResponsive();
 
+  // NEW: Project state management for multi-file support
+  const {
+    project,
+    setProject,      // ✅ ADD THIS
+    setActive,
+    toggleFolder,
+    updateContent,
+    createNewFile,
+    createNewFolder,
+    getCurrentFile,
+    removeFile,
+    removeFolder,
+    rename,
+    duplicateFile,
+    manualSave,      // ✅ ADD THIS
+    resetProject,    // ✅ ADD THIS
+  } = useProjectState();
+
   const {
     tabs,
     activeTabId,
@@ -104,6 +130,8 @@ export default function HomePage() {
     updateTabContent,
     setActiveTab,
     renameTab,
+    openOrActivateTab,
+    getTabByPath,
   } = useFileTabs(DEFAULT_CODE);
 
   const [showABIDialog, setShowABIDialog] = useState(false);
@@ -125,18 +153,15 @@ export default function HomePage() {
 
   const [parsedAbi, setParsedAbi] = useState<any>(null);
 
-  // Workspace tab (Editor vs Orbit Explorer vs ML vs Q-Learning vs Raytracing)
   const [workspaceTab, setWorkspaceTab] = useState<
-    'editor' | 'orbit' | 'ml' | 'qlearning' | 'raytracing'
-  >('editor');
+  'editor' | 'orbit' | 'ml' | 'qlearning' | 'raytracing'
+>('editor');
 
-  // Prevent hydration mismatch for responsive-based conditional rendering
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
   const mobile = mounted ? isMobile : false;
   const desktop = mounted ? isDesktop : true;
 
-  // Lock body scroll when a full-screen mobile panel is open
   useEffect(() => {
     if (!mounted) return;
     const anyMobileOverlayOpen = mobile && (showAIPanel || showContractPanel);
@@ -161,6 +186,29 @@ export default function HomePage() {
     }
   }, [abiData.abi]);
 
+  // NEW: Sync file tree clicks with tabs
+  const handleFileClick = (path: string) => {
+    const file = getFileByPath(project, path);
+    if (!file) return;
+
+    // Open or activate tab
+    openOrActivateTab(path, file.name, file.content, file.language);
+    
+    // Update project active file
+    setActive(path);
+  };
+
+  // NEW: Sync tab content changes with project
+  useEffect(() => {
+    if (activeTab && project.activeFilePath === activeTab.path) {
+      const projectFile = getFileByPath(project, activeTab.path);
+      if (projectFile && projectFile.content !== activeTab.content) {
+        // Update project content when tab content changes
+        updateContent(activeTab.path, activeTab.content);
+      }
+    }
+  }, [activeTab?.content, project.activeFilePath, activeTab?.path, updateContent, project]);
+
   const compilationStatus = useMemo(() => {
     if (isCompiling) return 'compiling';
     if (output.some((o) => o.type === 'complete' && o.data.includes('successful'))) return 'success';
@@ -175,7 +223,6 @@ export default function HomePage() {
     if (!activeTab) return;
     await compile(activeTab.content, true);
 
-    // Show output panel after compilation (on mobile, avoid forcing if AI overlay is open)
     if (desktop || !showAIPanel) {
       setShowOutput(true);
     }
@@ -192,7 +239,6 @@ export default function HomePage() {
         toggleAIPanel(); 
         return;
       }
-  
       toggleAIPanelCollapse();
     },
     onToggleOutput: toggleOutput,
@@ -207,7 +253,6 @@ export default function HomePage() {
       }
       clearOutput();
       setWorkspaceTab('editor');
-      // On mobile, ensure editor is visible (close overlays)
       if (mobile) {
         setShowAIPanel(false);
         setShowContractPanel(false);
@@ -234,7 +279,6 @@ export default function HomePage() {
   const handleDeploySuccess = (contractAddress: string, txHash?: string) => {
     setDeployedContracts((prev) => [...prev, { address: contractAddress, txHash }]);
     if (mobile) {
-      // After deploy, auto-open contract panel on mobile
       setShowAIPanel(false);
       setShowContractPanel(true);
     }
@@ -316,7 +360,6 @@ export default function HomePage() {
     }
   };
 
-  // Mobile: keep overlays mutually exclusive
   const handleToggleAI = () => {
     if (mobile) {
       setShowContractPanel(false);
@@ -340,6 +383,12 @@ export default function HomePage() {
     setShowContractPanel(false);
   };
 
+  const handleImportProject = useCallback((importedProject: ProjectState) => {
+    setProject(importedProject);
+    // Clear tabs and reload
+    window.location.reload();
+  }, [setProject]);
+
   return (
     <>
       <SetupGuide />
@@ -359,7 +408,7 @@ export default function HomePage() {
       />
 
       <main className="h-screen flex flex-col bg-background">
-        {/* Header (wraps on mobile, everything remains accessible via Actions menu) */}
+        {/* Header */}
         <header className="border-b border-border px-3 py-2 md:px-4 md:py-0 md:h-14 flex items-center justify-between gap-2 flex-wrap">
           <div className="min-w-0 flex items-center gap-2">
             <Link
@@ -368,7 +417,6 @@ export default function HomePage() {
             >
               Stylus IDE
             </Link>
-            {/* Small status dot on mobile */}
             <div className="md:hidden flex items-center gap-2">
               {compilationStatus === 'success' && <CheckCircle2 className="h-4 w-4 text-green-400" />}
               {compilationStatus === 'error' && <XCircle className="h-4 w-4 text-red-400" />}
@@ -379,17 +427,20 @@ export default function HomePage() {
           </div>
 
           <div className="flex items-center gap-2 flex-wrap justify-end">
-            {/* Connect Wallet */}
             <ConnectButton />
             <FaucetButton />
+            <ProjectActions
+              project={project}
+              onImport={handleImportProject}
+              onReset={resetProject}
+              onSave={manualSave}
+            />  
 
-            {/* Desktop / Tablet Actions */}
             <Button onClick={handleCompile} disabled={isCompiling} size="sm" className="hidden sm:flex">
               <Play className="h-4 w-4 mr-2" />
               {isCompiling ? 'Compiling...' : 'Compile'}
             </Button>
 
-            {/* Benchmark Button - Only show if ABI exists */}
             {abiData.abi && (
               <Button
                 variant="outline"
@@ -402,7 +453,6 @@ export default function HomePage() {
               </Button>
             )}
 
-            {/* Export ABI */}
             <Button
               onClick={handleExportABI}
               disabled={!canExportAbi}
@@ -414,7 +464,6 @@ export default function HomePage() {
               {isExportingABI ? 'Exporting...' : 'Export ABI'}
             </Button>
 
-            {/* Deploy */}
             <Button
               onClick={() => setShowDeployDialog(true)}
               disabled={!canDeploy}
@@ -425,7 +474,6 @@ export default function HomePage() {
               Deploy
             </Button>
 
-            {/* Templates Dropdown (desktop/tablet) */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="outline" size="sm" className="hidden md:flex">
@@ -445,7 +493,6 @@ export default function HomePage() {
               </DropdownMenuContent>
             </DropdownMenu>
 
-            {/* Mobile Actions Menu (NO FEATURE LOSS) */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="outline" size="icon" className="sm:hidden" aria-label="Actions">
@@ -487,80 +534,29 @@ export default function HomePage() {
               </DropdownMenuContent>
             </DropdownMenu>
 
-            {/* AI Panel Toggle */}
             <Button
               variant="ghost"
               size="icon"
-              className="focus-visible-ring"
-              onClick={() => {
-                if (mobile) {
-                  // full-screen overlay on mobile
-                  setShowContractPanel(false);
-                  setShowAIPanel(!showAIPanel);
-                } else {
-                  toggleAIPanelCollapse();
-                }
-              }}
-              aria-label={
-                mobile
-                  ? showAIPanel
-                    ? 'Close AI assistant (Esc)'
-                    : 'Open AI assistant (Cmd+K)'
-                  : isAIPanelCollapsed
-                    ? 'Show AI assistant'
-                    : 'Hide AI assistant'
-              }
-              title={
-                mobile
-                  ? showAIPanel
-                    ? 'Close AI assistant (Esc)'
-                    : 'Open AI assistant (Cmd+K)'
-                  : isAIPanelCollapsed
-                    ? 'Show AI assistant'
-                    : 'Hide AI assistant'
-              }
+              className="focus-visible-ring "
+              onClick={handleToggleAI}
+              aria-label="Toggle AI assistant"
             >
               <Bot className="h-5 w-5" />
             </Button>
 
-            {/* Contract Panel Toggle */}
             <Button
               variant="ghost"
               size="icon"
               className="focus-visible-ring"
-              onClick={() => {
-                if (mobile) {
-                  setShowAIPanel(false);
-                  setShowContractPanel(!showContractPanel);
-                } else {
-                  toggleContractPanelCollapse();
-                }
-              }}
-              aria-label={
-                mobile
-                  ? showContractPanel
-                    ? 'Close contract panel'
-                    : 'Open contract panel'
-                  : isContractPanelCollapsed
-                    ? 'Show contract panel'
-                    : 'Hide contract panel'
-              }
-              title={
-                mobile
-                  ? showContractPanel
-                    ? 'Close contract panel'
-                    : 'Open contract panel'
-                  : isContractPanelCollapsed
-                    ? 'Show contract panel'
-                    : 'Hide contract panel'
-              }
+              onClick={handleToggleContract}
+              aria-label="Toggle contract panel"
             >
               <FileText className="h-5 w-5" />
             </Button>
           </div>
         </header>
 
-        {/* Workspace Tabs Bar (scrollable on mobile) */}
+        {/* Workspace Tabs Bar */}
         <div className="h-10 border-b border-border bg-card flex items-center px-2 sm:px-4 gap-2 overflow-x-auto whitespace-nowrap">
           <Button
             size="sm"
@@ -604,11 +600,9 @@ export default function HomePage() {
           </Button>
         </div>
 
-        {/* Main Content Area with Responsive Layout */}
+        {/* Main Content Area */}
         <div className="flex-1 flex flex-col lg:flex-row overflow-hidden">
-          {/* Primary Content Area */}
           <div className="flex-1 flex flex-col min-w-0 relative">
-            {/* Orbit Explorer */}
             {workspaceTab === 'orbit' ? (
               <section className="flex-1 min-h-0 overflow-auto bg-muted/30">
                 <div className="p-3 sm:p-6">
@@ -629,85 +623,115 @@ export default function HomePage() {
               </section>
             ) : (
               <>
-                {/* Editor Section */}
-                <section className="flex-1 flex flex-col min-h-0">
-                  {/* File Tabs */}
-                  <FileTabs
-                    tabs={tabs}
-                    activeTabId={activeTabId}
-                    onTabClick={setActiveTab}
-                    onTabClose={removeTab}
-                    onNewFile={handleNewFile}
-                    onRenameTab={renameTab}
-                  />
-
-                  {/* Active Tab Toolbar */}
-                  <div className="h-10 border-b border-border flex items-center justify-between px-2 sm:px-4 gap-2">
-                    <div className="flex items-center gap-2 overflow-x-auto">
-                      <span className="text-xs text-muted-foreground shrink-0">
-                        {tabs.length} file{tabs.length !== 1 ? 's' : ''}
-                      </span>
-
-                      {errors.length > 0 && (
-                        <span className="text-xs bg-red-500/20 text-red-400 px-2 py-0.5 rounded-full shrink-0">
-                          {errors.length} {errors.length === 1 ? 'error' : 'errors'}
-                        </span>
-                      )}
-
-                      {compilationTime !== null && (
-                        <span className="hidden sm:flex text-xs text-muted-foreground items-center gap-1 shrink-0">
-                          <Clock className="h-3 w-3" />
-                          {formatCompilationTime(compilationTime)}
-                        </span>
-                      )}
-                    </div>
-
-                    <div className="flex items-center gap-2 shrink-0">
-                      {/* Mobile quick compile */}
-                      <Button
-                        onClick={handleCompile}
-                        disabled={isCompiling || !activeTab}
-                        size="sm"
-                        className="sm:hidden h-7"
-                        aria-label="Compile"
-                        title="Compile"
-                      >
-                        <Play className="h-3 w-3" />
-                      </Button>
-
-                      {/* Mobile Output Toggle */}
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="sm:hidden h-7"
-                        onClick={toggleOutput}
-                        aria-label={showOutput ? 'Hide output panel' : 'Show output panel'}
-                      >
-                        Output {showOutput ? '−' : '+'}
-                      </Button>
-                    </div>
+                {/* NEW: File Tree + Editor Layout */}
+                <div className="flex-1 flex min-h-0">
+                  {/* File Tree Sidebar (Desktop Only) */}
+                  <div className="hidden md:block w-64 border-r border-border">
+                    <FileTree
+                      structure={project.structure}
+                      activeFilePath={project.activeFilePath}
+                      onFileClick={handleFileClick}
+                      onFolderToggle={toggleFolder}
+                      onNewFile={(path) => {
+                        createNewFile(path || 'new_file.rs');
+                      }}
+                      onNewFolder={(path) => {
+                        createNewFolder(path || 'new_folder');
+                      }}
+                      onRename={(oldPath, newName) => {
+                        const pathParts = oldPath.split('/');
+                        pathParts[pathParts.length - 1] = newName;
+                        const newPath = pathParts.join('/');
+                        rename(oldPath, newPath);
+                      }}
+                      onDuplicate={(path) => {
+                        duplicateFile(path);
+                      }}
+                      onDelete={(path, isFolder) => {
+                        if (isFolder) {
+                          removeFolder(path);
+                        } else {
+                          removeFile(path);
+                        }
+                      }}
+                    />
                   </div>
 
-                  {/* Monaco Editor */}
-                  <div className="flex-1 bg-card transition-all duration-300 min-h-0">
-                    {activeTab ? (
-                      <MonacoEditor
-                        key={activeTab.id}
-                        value={activeTab.content}
-                        onChange={(value) => updateTabContent(activeTab.id, value)}
-                        onSave={handleSave}
-                        readOnly={isCompiling}
-                        errors={errors}
-                      />
-                    ) : (
-                      <div className="h-full flex items-center justify-center text-muted-foreground">
-                        No file open
+                  {/* Editor Section */}
+                  <section className="flex-1 flex flex-col min-w-0">
+                    <FileTabs
+                      tabs={tabs}
+                      activeTabId={activeTabId}
+                      onTabClick={setActiveTab}
+                      onTabClose={removeTab}
+                      onNewFile={handleNewFile}
+                      onRenameTab={renameTab}
+                    />
+
+                    <div className="h-10 border-b border-border flex items-center justify-between px-2 sm:px-4 gap-2">
+                      <div className="flex items-center gap-2 overflow-x-auto">
+                        <span className="text-xs text-muted-foreground shrink-0">
+                          {tabs.length} file{tabs.length !== 1 ? 's' : ''}
+                        </span>
+
+                        {errors.length > 0 && (
+                          <span className="text-xs bg-red-500/20 text-red-400 px-2 py-0.5 rounded-full shrink-0">
+                            {errors.length} {errors.length === 1 ? 'error' : 'errors'}
+                          </span>
+                        )}
+
+                        {compilationTime !== null && (
+                          <span className="hidden sm:flex text-xs text-muted-foreground items-center gap-1 shrink-0">
+                            <Clock className="h-3 w-3" />
+                            {formatCompilationTime(compilationTime)}
+                          </span>
+                        )}
                       </div>
-                    )}
-                  </div>
-                </section>
 
-                {/* Bottom Panel - Output (responsive) */}
+                      <div className="flex items-center gap-2 shrink-0">
+                        <Button
+                          onClick={handleCompile}
+                          disabled={isCompiling || !activeTab}
+                          size="sm"
+                          className="sm:hidden h-7"
+                          aria-label="Compile"
+                          title="Compile"
+                        >
+                          <Play className="h-3 w-3" />
+                        </Button>
+
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="sm:hidden h-7"
+                          onClick={toggleOutput}
+                          aria-label={showOutput ? 'Hide output panel' : 'Show output panel'}
+                        >
+                          Output {showOutput ? '−' : '+'}
+                        </Button>
+                      </div>
+                    </div>
+
+                    <div className="flex-1 bg-card transition-all duration-300 min-h-0">
+                      {activeTab ? (
+                        <MonacoEditor
+                          key={activeTab.id}
+                          value={activeTab.content}
+                          onChange={(value) => updateTabContent(activeTab.id, value)}
+                          onSave={handleSave}
+                          readOnly={isCompiling}
+                          errors={errors}
+                        />
+                      ) : (
+                        <div className="h-full flex items-center justify-center text-muted-foreground">
+                          No file open
+                        </div>
+                      )}
+                    </div>
+                  </section>
+                </div>
+
+                {/* Bottom Panel - Output */}
                 <section
                   className={`
                     border-t border-border flex flex-col bg-card
@@ -807,7 +831,6 @@ export default function HomePage() {
                 border-l border-border bg-card flex flex-col
               `}
             >
-              {/* Mobile Header */}
               <div className="lg:hidden h-14 border-b border-border flex items-center justify-between px-4 bg-card/95 backdrop-blur-sm">
                 <span className="font-semibold">AI Assistant</span>
                 <Button variant="ghost" size="icon" onClick={() => setShowAIPanel(false)} aria-label="Close AI panel">
@@ -815,7 +838,6 @@ export default function HomePage() {
                 </Button>
               </div>
 
-              {/* AI Panel Content */}
               <div className="flex-1 min-h-0 lg:h-full">
                 <ChatPanel
                   currentCode={activeTab?.content}
@@ -842,7 +864,6 @@ export default function HomePage() {
                 border-l border-border bg-card flex flex-col
               `}
             >
-              {/* Mobile Header */}
               <div className="lg:hidden h-14 border-b border-border flex items-center justify-between px-4 bg-card/95 backdrop-blur-sm">
                 <span className="font-semibold">Contract Interaction</span>
                 <Button
@@ -855,7 +876,6 @@ export default function HomePage() {
                 </Button>
               </div>
 
-              {/* Contract Panel Content */}
               <div className="flex-1 min-h-0 lg:h-full">
                 {deployedContracts.length > 0 && abiData.abi ? (
                   <ContractInteraction
@@ -879,16 +899,14 @@ export default function HomePage() {
           )}
         </div>
 
-        {/* Keyboard Shortcut Helper */}
         <KeyboardShortcutHint />
 
-        {/* Benchmark Dialog */}
         {parsedAbi && (
           <BenchmarkDialog
             open={showBenchmarkDialog}
             onOpenChange={setShowBenchmarkDialog}
             abi={parsedAbi}
-            functionName="number" // Default function, can be made dynamic
+            functionName="number"
             title="Multi-Chain Gas Benchmark"
             description="Deploy your contract to multiple chains and compare gas costs"
           />
