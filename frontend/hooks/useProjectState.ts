@@ -14,27 +14,36 @@ import {
   toggleFileOpen,
   getFileByPath,
 } from "@/lib/project-manager";
-import { saveProject, loadProject } from "@/lib/storage"; // NEW
+import { saveProject, loadProject } from "@/lib/storage";
 
 export function useProjectState(initialName: string = "my-stylus-project") {
-  // NEW: Load from localStorage or create new project
-  const [project, setProject] = useState<ProjectState>(() => {
-    if (typeof window !== "undefined") {
+  // ✅ FIXED: Always start with default project (server + client match)
+  const [project, setProject] = useState<ProjectState>(() =>
+    createProject(initialName)
+  );
+
+  // ✅ FIXED: Track if we've loaded from localStorage
+  const [isHydrated, setIsHydrated] = useState(false);
+
+  // ✅ FIXED: Load from localStorage AFTER mount (client-only)
+  useEffect(() => {
+    if (typeof window !== "undefined" && !isHydrated) {
       const savedProject = loadProject();
       if (savedProject) {
-        return savedProject;
+        setProject(savedProject);
       }
+      setIsHydrated(true);
     }
-    return createProject(initialName);
-  });
+  }, [isHydrated]);
 
+  // Auto-save timer refs
   const saveTimerRef = useRef<NodeJS.Timeout | null>(null);
   const lastSaveRef = useRef<string>("");
 
-  // NEW: Auto-save effect
+  // ✅ FIXED: Auto-save only after hydration
   useEffect(() => {
-    // Skip if running on server
-    if (typeof window === "undefined") return;
+    // Skip if running on server OR not hydrated yet
+    if (typeof window === "undefined" || !isHydrated) return;
 
     // Serialize project for comparison
     const projectSnapshot = JSON.stringify(project);
@@ -60,7 +69,7 @@ export function useProjectState(initialName: string = "my-stylus-project") {
         clearTimeout(saveTimerRef.current);
       }
     };
-  }, [project]);
+  }, [project, isHydrated]);
 
   // Create new file
   const createNewFile = useCallback((path: string, content?: string) => {
@@ -210,13 +219,13 @@ export function useProjectState(initialName: string = "my-stylus-project") {
     return project.files.filter((f) => f.isOpen);
   }, [project.files]);
 
-  // NEW: Manual save function
+  // Manual save function
   const manualSave = useCallback(() => {
     saveProject(project);
     console.log("Project manually saved");
   }, [project]);
 
-  // NEW: Reset to new project
+  // Reset to new project
   const resetProject = useCallback(() => {
     const newProject = createProject(initialName);
     setProject(newProject);
@@ -238,8 +247,9 @@ export function useProjectState(initialName: string = "my-stylus-project") {
     duplicateFile,
     getCurrentFile,
     getOpenFiles,
-    manualSave, // NEW
-    resetProject, // NEW
+    manualSave,
+    resetProject,
+    isHydrated, // ✅ NEW: Export for debugging
   };
 }
 
