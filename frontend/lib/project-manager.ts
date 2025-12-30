@@ -18,12 +18,16 @@ import {
 /**
  * Create a new empty project
  */
-export function createProject(name: string): ProjectState {
+export function createProject(
+  name: string,
+  source: "local" | "github" = "local"
+): ProjectState {
   const now = new Date();
 
   return {
     id: uuidv4(),
     name,
+    type: "stylus-contract", // ✅ ADD THIS LINE
     files: [
       // Default starter files
       createDefaultFile("src/lib.rs", "rust", getDefaultRustContent()),
@@ -53,9 +57,12 @@ export function createProject(name: string): ProjectState {
       },
     ],
     activeFilePath: "src/lib.rs",
-    source: "local",
+    source: source,
     createdAt: now,
     updatedAt: now,
+    metadata: {
+      source,
+    },
   };
 }
 

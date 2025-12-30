@@ -15,6 +15,28 @@ export interface ProjectFile {
   updatedAt: Date;
 }
 
+export interface ProjectState {
+  id: string;
+  name: string;
+  type: "stylus-contract" | "stylus-library";
+  files: ProjectFile[];
+  structure: FileNode[];
+  activeFilePath: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+  metadata?: {
+    // ✅ ADD THIS
+    source?: "github" | "blockchain" | "local";
+    owner?: string;
+    repo?: string;
+    branch?: string;
+    url?: string;
+    loadedAt?: string;
+    chain?: string;
+    address?: string;
+  };
+}
+
 export interface FileNode {
   id: string; // Unique identifier
   name: string; // Display name
@@ -26,15 +48,25 @@ export interface FileNode {
 }
 
 export interface ProjectState {
-  id: string; // Project identifier
-  name: string; // Project name
-  files: ProjectFile[]; // All project files
-  structure: FileNode[]; // Tree structure
-  activeFilePath: string | null; // Currently active file
-  source: "local" | "github" | "onchain";
-  metadata?: ProjectMetadata;
+  id: string;
+  name: string;
+  files: ProjectFile[];
+  structure: FileNode[];
+  activeFilePath: string | null;
+  source: string;
   createdAt: Date;
   updatedAt: Date;
+  metadata?: {
+    // ✅ ADD THIS (optional field)
+    source?: "github" | "blockchain" | "local";
+    owner?: string;
+    repo?: string;
+    branch?: string;
+    url?: string;
+    loadedAt?: string;
+    chain?: string;
+    address?: string;
+  };
 }
 
 export interface ProjectMetadata {

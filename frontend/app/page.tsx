@@ -19,7 +19,9 @@ import {
   Zap,
 } from 'lucide-react';
 import { useAccount } from 'wagmi';
-
+import { parseURL } from '@/lib/url-parser';
+import { useGitHubLoader } from '@/hooks/useGitHubLoader';
+import { GitHubLoadingDialog } from '@/components/github/GitHubLoadingDialog';
 import { SetupGuide } from '@/components/setup/SetupGuide';
 import { MonacoEditor } from '@/components/editor/MonacoEditor';
 import { ABIDialog } from '@/components/abi/ABIDialog';
@@ -41,12 +43,9 @@ import { KeyboardShortcutHint } from '@/components/ui/KeyboardShortcutHint';
 import { BenchmarkDialog } from '@/components/orbit/BenchmarkDialog';
 import { OrbitExplorer } from '@/components/orbit/OrbitExplorer';
 import { ProjectActions } from '@/components/project/ProjectActions';
-
-// NEW IMPORTS FOR MULTI-FILE SUPPORT
+import { getFileByPath, buildFileTree } from '@/lib/project-manager'; 
 import { FileTree } from '@/components/file-tree/FileTree';
 import { useProjectState } from '@/hooks/useProjectState';
-import { getFileByPath } from '@/lib/project-manager';
-
 import { templates, getTemplate } from '@/lib/templates';
 import { stripAnsiCodes, formatCompilationTime } from '@/lib/output-formatter';
 import { useCompilation } from '@/hooks/useCompilation';
@@ -152,7 +151,8 @@ export default function HomePage() {
     useCompilation();
 
   const [parsedAbi, setParsedAbi] = useState<any>(null);
-
+  const { isLoading: isLoadingGitHub, progress: githubProgress, loadFromGitHub } = useGitHubLoader();
+  const [showGitHubDialog, setShowGitHubDialog] = useState(false);
   const [workspaceTab, setWorkspaceTab] = useState<
   'editor' | 'orbit' | 'ml' | 'qlearning' | 'raytracing'
 >('editor');
@@ -172,6 +172,18 @@ export default function HomePage() {
     };
   }, [mounted, mobile, showAIPanel, showContractPanel]);
 
+  // NEW: Check URL on mount
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const searchParams = new URLSearchParams(window.location.search);
+    const url = searchParams.get('url');
+
+    if (url) {
+      handleURLLoad(url);
+    }
+  }, []);
+
   useEffect(() => {
     if (abiData.abi) {
       try {
@@ -185,6 +197,48 @@ export default function HomePage() {
       setParsedAbi(null);
     }
   }, [abiData.abi]);
+
+  const handleURLLoad = async (url: string) => {
+    const parsed = parseURL(url);
+
+    if (parsed.type === 'github') {
+      setShowGitHubDialog(true);
+      const project = await loadFromGitHub(parsed);
+
+      if (project) {
+        // Load project into IDE
+        setProject(project);
+        
+        // Build file tree structure from files
+        const updatedProject = {
+          ...project,
+          structure: buildFileTree(project.files),
+        };
+        setProject(updatedProject);
+
+        // Open first Rust file in tab
+        const firstRustFile = project.files.find((f) => f.language === 'rust' && f.isOpen);
+        if (firstRustFile) {
+          openOrActivateTab(
+            firstRustFile.path,
+            firstRustFile.name,
+            firstRustFile.content,
+            firstRustFile.language
+          );
+        }
+
+        // Close dialog after 2 seconds
+        setTimeout(() => {
+          setShowGitHubDialog(false);
+        }, 2000);
+      }
+    } else if (parsed.type === 'blockchain') {
+      // TODO: Phase 3
+      alert('Blockchain loading coming in Phase 3!');
+    } else {
+      alert('Unsupported URL format. Please use GitHub or blockchain explorer URLs.');
+    }
+  };
 
   // NEW: Sync file tree clicks with tabs
   const handleFileClick = (path: string) => {
@@ -392,6 +446,18 @@ export default function HomePage() {
   return (
     <>
       <SetupGuide />
+
+      {/* NEW: GitHub Loading Dialog */}
+      <GitHubLoadingDialog
+        open={showGitHubDialog}
+        onOpenChange={setShowGitHubDialog}
+        progress={githubProgress}
+        onRetry={() => {
+          const searchParams = new URLSearchParams(window.location.search);
+          const url = searchParams.get('url');
+          if (url) handleURLLoad(url);
+        }}
+      />
 
       <ABIDialog
         open={showABIDialog}
