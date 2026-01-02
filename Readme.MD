@@ -30,10 +30,8 @@ _Build, Deploy, and Interact with Rust Smart Contracts - All in Your Browser_
 - [💡 Use Cases](#-use-cases)
 - [🎬 Demo Workflows](#-demo-workflows)
 - [🛠️ Technical Stack](#️-technical-stack)
-- [🎨 Screenshots](#-screenshots)
 - [🏆 Why This Matters](#-why-this-matters)
 - [🤝 Contributing](#-contributing)
-- [📄 License](#-license)
 
 ---
 
@@ -275,7 +273,7 @@ Load and interact with any verified contract from blockchain explorers.
 └────────────────────────────────────────────────────────────┘
 
 User Input:
-  localhost:3000/?url=https://arbiscan.io/address/0xFd086bC...
+  localhost:3000/?url=https://arbiscan.io/address/0xFd086bC7CD5C481DCC9C85ebE478A1C0b69FCbb9
                               │
                               ▼
                     ┌─────────────────┐
@@ -800,14 +798,22 @@ http://localhost:3000
 ```bash
 # .env.local
 
-# GitHub API (Optional - increases rate limit from 60 to 5000/hour)
-NEXT_PUBLIC_GITHUB_TOKEN=your_github_token_here
+NEXT_PUBLIC_RPC_URL=https://sepolia-rollup.arbitrum.io/rpc
+NEXT_PUBLIC_CHAIN_ID=421614
+OPENAI_API_KEY=your_open_ai_api_key_here
 
-# Etherscan API (Required for blockchain contract loading)
+# Blockchain Explorer API Keys
+# Get your API keys from:
+# - Arbiscan: https://arbiscan.io/myapikey
+# - Etherscan: https://etherscan.io/myapikey
+# - Basescan: https://basescan.org/myapikey
+
+NEXT_PUBLIC_ARBISCAN_API_KEY=your_arbiscan_api_key_here
 NEXT_PUBLIC_ETHERSCAN_API_KEY=your_etherscan_api_key_here
+NEXT_PUBLIC_BASESCAN_API_KEY=your_basescan_api_key_here
 
-# Optional: Claude AI API (for AI assistant)
-ANTHROPIC_API_KEY=your_anthropic_key_here
+# GitHub Token (optional, increases rate limit)
+NEXT_PUBLIC_GITHUB_TOKEN=your_github_token_here
 ```
 
 ### Get API Keys
@@ -1392,7 +1398,7 @@ We welcome contributions! Here's how:
 
 ```bash
 # Fork repository
-git clone https://github.com/YOUR_USERNAME/stylus-ide.git
+git clone https://github.com/sumionochi/stylus-ide.git
 
 # Create feature branch
 git checkout -b feature/amazing-feature
@@ -1451,9 +1457,7 @@ MIT License - see [LICENSE](LICENSE) file for details.
 
 **Category:** Development Tools / Infrastructure  
 **Prize Track:** Arbitrum $2,000 First Place  
-**Built For:** Arbitrum Stylus Smart Contracts  
-**Team Size:** [Your team size]  
-**Development Time:** ~20 hours over 6 days
+**Built For:** Arbitrum Stylus Smart Contracts
 
 ### Key Achievements
 
@@ -1491,12 +1495,8 @@ MIT License - see [LICENSE](LICENSE) file for details.
 
 ## 📞 Contact
 
-**Live Demo:** [https://your-deployed-url.vercel.app](https://your-deployed-url.vercel.app)  
-**GitHub:** [https://github.com/your-username/stylus-ide](https://github.com/your-username/stylus-ide)  
-**Video Demo:** [YouTube Link]  
-**Team:** [Your name/team]  
-**Email:** [Your email]  
-**Twitter:** [@yourhandle](https://twitter.com/yourhandle)
+**Email:** aaditya.srivastava.connect@gmail.com
+**Twitter:** [@sumionochi](https://twitter.com/sumionochi)
 
 ---
 
@@ -1509,43 +1509,8 @@ MIT License - see [LICENSE](LICENSE) file for details.
 
 ---
 
-## 🚀 Future Roadmap
-
-**Phase 1: Core Features** ✅ COMPLETE
-
-- Multi-file IDE
-- GitHub integration
-- Blockchain inspector
-- Advanced demos
-- Benchmarking
-
-**Phase 2: Collaboration** (Q2 2024)
-
-- Real-time multiplayer editing
-- Project sharing via cloud
-- Version control integration
-- Team workspaces
-
-**Phase 3: Advanced Tools** (Q3 2024)
-
-- Debugger with breakpoints
-- Test runner integration
-- Performance profiler
-- Security analyzer
-
-**Phase 4: Ecosystem** (Q4 2024)
-
-- Template marketplace
-- Plugin system
-- Community examples
-- Educational courses
-
----
-
 <div align="center">
 
 **Built with ❤️ for the Arbitrum ecosystem**
-
-[⭐ Star on GitHub](https://github.com/your-username/stylus-ide) • [🐛 Report Bug](https://github.com/your-username/stylus-ide/issues) • [💡 Request Feature](https://github.com/your-username/stylus-ide/issues)
 
 </div>
