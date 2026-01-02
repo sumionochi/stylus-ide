@@ -54,6 +54,10 @@ import { usePanelState } from '@/hooks/usePanelState';
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
 import { useResponsive } from '@/hooks/useResponsive';
 import { ProjectState } from '@/types/project';
+import { toast } from 'sonner'; 
+import { LoadFromGitHubDialog } from '@/components/github/LoadFromGitHubDialog';  
+import { FileTreeSkeleton } from '@/components/file-tree/FileTreeSkeleton';
+import { GitHubMetadataBanner } from '@/components/github/GitHubMetadataBanner';
 
 const DEFAULT_CODE = `// Welcome to Stylus IDE - Multi-File Project
 
@@ -180,7 +184,23 @@ export default function HomePage() {
     const url = searchParams.get('url');
 
     if (url) {
-      handleURLLoad(url);
+      // ✅ UPDATED: Build full URL with query params
+      const branch = searchParams.get('branch');
+      const file = searchParams.get('file');
+      const path = searchParams.get('path');
+      
+      let fullUrl = url;
+      const params = new URLSearchParams();
+      
+      if (branch) params.set('branch', branch);
+      if (file) params.set('file', file);
+      if (path) params.set('path', path);
+      
+      if (params.toString()) {
+        fullUrl += (url.includes('?') ? '&' : '?') + params.toString();
+      }
+      
+      handleURLLoad(fullUrl);
     }
   }, []);
 
@@ -198,11 +218,14 @@ export default function HomePage() {
     }
   }, [abiData.abi]);
 
-  const handleURLLoad = async (url: string) => {
-    const parsed = parseURL(url);
+  // Update the existing handleURLLoad function
+const handleURLLoad = async (url: string) => {
+  const parsed = parseURL(url);
 
-    if (parsed.type === 'github') {
-      setShowGitHubDialog(true);
+  if (parsed.type === 'github') {
+    setShowGitHubDialog(true);
+    
+    try {
       const project = await loadFromGitHub(parsed);
 
       if (project) {
@@ -227,18 +250,41 @@ export default function HomePage() {
           );
         }
 
-        // Close dialog after 2 seconds
+        // Show success toast
+        toast.success('Repository loaded!', {
+          description: `Loaded ${project.files.length} files from ${parsed.owner}/${parsed.repo}`,
+        });
+
+        // Clean URL after successful load (remove ?url= param)
+        if (typeof window !== 'undefined') {
+          window.history.replaceState({}, '', window.location.pathname);
+        }
+
+        // Close dialog after 1.5 seconds
         setTimeout(() => {
           setShowGitHubDialog(false);
-        }, 2000);
+        }, 1500);
       }
-    } else if (parsed.type === 'blockchain') {
-      // TODO: Phase 3
-      alert('Blockchain loading coming in Phase 3!');
-    } else {
-      alert('Unsupported URL format. Please use GitHub or blockchain explorer URLs.');
+    } catch (error) {
+      // Error toast
+      const errorMessage = error instanceof Error ? error.message : 'Failed to load repository';
+      toast.error('Failed to load repository', {
+        description: errorMessage,
+      });
+      
+      // Keep dialog open on error so user can retry
     }
-  };
+  } else if (parsed.type === 'blockchain') {
+    // TODO: Phase 3
+    toast.info('Coming soon', {
+      description: 'Blockchain loading will be available in Phase 3',
+    });
+  } else {
+    toast.error('Invalid URL', {
+      description: 'Please use a GitHub repository URL',
+    });
+  }
+};
 
   // NEW: Sync file tree clicks with tabs
   const handleFileClick = (path: string) => {
@@ -446,7 +492,7 @@ export default function HomePage() {
   return (
     <>
       <SetupGuide />
-
+  
       {/* NEW: GitHub Loading Dialog */}
       <GitHubLoadingDialog
         open={showGitHubDialog}
@@ -458,21 +504,21 @@ export default function HomePage() {
           if (url) handleURLLoad(url);
         }}
       />
-
+  
       <ABIDialog
         open={showABIDialog}
         onOpenChange={setShowABIDialog}
         abi={abiData.abi}
         solidity={abiData.solidity}
       />
-
+  
       <DeployDialog
         open={showDeployDialog}
         onOpenChange={setShowDeployDialog}
         sessionId={sessionId}
         onDeploySuccess={handleDeploySuccess}
       />
-
+  
       <main className="h-screen flex flex-col bg-background">
         {/* Header */}
         <header className="border-b border-border px-3 py-2 md:px-4 md:py-0 md:h-14 flex items-center justify-between gap-2 flex-wrap">
@@ -491,22 +537,28 @@ export default function HomePage() {
               )}
             </div>
           </div>
-
+  
           <div className="flex items-center gap-2 flex-wrap justify-end">
             <ConnectButton />
+            
             <FaucetButton />
+            {/* NEW: Load from GitHub Button */}
+            <LoadFromGitHubDialog 
+              onLoadURL={handleURLLoad}
+              isLoading={isLoadingGitHub}
+            />
             <ProjectActions
               project={project}
               onImport={handleImportProject}
               onReset={resetProject}
               onSave={manualSave}
             />  
-
+  
             <Button onClick={handleCompile} disabled={isCompiling} size="sm" className="hidden sm:flex">
               <Play className="h-4 w-4 mr-2" />
               {isCompiling ? 'Compiling...' : 'Compile'}
             </Button>
-
+  
             {abiData.abi && (
               <Button
                 variant="outline"
@@ -518,7 +570,7 @@ export default function HomePage() {
                 Benchmark Orbit
               </Button>
             )}
-
+  
             <Button
               onClick={handleExportABI}
               disabled={!canExportAbi}
@@ -529,7 +581,7 @@ export default function HomePage() {
               <Download className="h-4 w-4 mr-2" />
               {isExportingABI ? 'Exporting...' : 'Export ABI'}
             </Button>
-
+  
             <Button
               onClick={() => setShowDeployDialog(true)}
               disabled={!canDeploy}
@@ -539,7 +591,7 @@ export default function HomePage() {
               <Upload className="h-4 w-4 mr-2" />
               Deploy
             </Button>
-
+  
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="outline" size="sm" className="hidden md:flex">
@@ -558,7 +610,7 @@ export default function HomePage() {
                 ))}
               </DropdownMenuContent>
             </DropdownMenu>
-
+  
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="outline" size="icon" className="sm:hidden" aria-label="Actions">
@@ -570,24 +622,24 @@ export default function HomePage() {
                   <Play className="h-4 w-4 mr-2" />
                   {isCompiling ? 'Compiling...' : 'Compile'}
                 </DropdownMenuItem>
-
+  
                 <DropdownMenuItem onClick={handleExportABI} disabled={!canExportAbi}>
                   <Download className="h-4 w-4 mr-2" />
                   {isExportingABI ? 'Exporting ABI…' : 'Export ABI'}
                 </DropdownMenuItem>
-
+  
                 <DropdownMenuItem onClick={() => setShowDeployDialog(true)} disabled={!canDeploy}>
                   <Upload className="h-4 w-4 mr-2" />
                   Deploy
                 </DropdownMenuItem>
-
+  
                 {abiData.abi && (
                   <DropdownMenuItem onClick={() => setShowBenchmarkDialog(true)}>
                     <Zap className="h-4 w-4 mr-2" />
                     Benchmark Orbit
                   </DropdownMenuItem>
                 )}
-
+  
                 <div className="px-2 py-1.5 text-xs text-muted-foreground">Templates</div>
                 {templates.map((template) => (
                   <DropdownMenuItem key={template.id} onClick={() => handleLoadTemplate(template.id)}>
@@ -599,17 +651,17 @@ export default function HomePage() {
                 ))}
               </DropdownMenuContent>
             </DropdownMenu>
-
+  
             <Button
               variant="ghost"
               size="icon"
-              className="focus-visible-ring "
+              className="focus-visible-ring"
               onClick={handleToggleAI}
               aria-label="Toggle AI assistant"
             >
               <Bot className="h-5 w-5" />
             </Button>
-
+  
             <Button
               variant="ghost"
               size="icon"
@@ -621,7 +673,7 @@ export default function HomePage() {
             </Button>
           </div>
         </header>
-
+  
         {/* Workspace Tabs Bar */}
         <div className="h-10 border-b border-border bg-card flex items-center px-2 sm:px-4 gap-2 overflow-x-auto whitespace-nowrap">
           <Button
@@ -665,7 +717,20 @@ export default function HomePage() {
             Raytracing
           </Button>
         </div>
-
+  
+        {/* NEW: GitHub Metadata Banner */}
+        {project.metadata?.source === 'github' && 
+        project.metadata.owner && 
+        project.metadata.repo && (
+          <GitHubMetadataBanner
+            owner={project.metadata.owner}
+            repo={project.metadata.repo}
+            branch={project.metadata.branch || 'main'}
+            url={project.metadata.url || `https://github.com/${project.metadata.owner}/${project.metadata.repo}`}
+            folderPath={project.metadata.folderPath}  // ✅ ADD THIS
+          />
+        )}
+  
         {/* Main Content Area */}
         <div className="flex-1 flex flex-col lg:flex-row overflow-hidden">
           <div className="flex-1 flex flex-col min-w-0 relative">
@@ -691,38 +756,42 @@ export default function HomePage() {
               <>
                 {/* NEW: File Tree + Editor Layout */}
                 <div className="flex-1 flex min-h-0">
-                  {/* File Tree Sidebar (Desktop Only) */}
+                  {/* ✅ UPDATED: File Tree Sidebar with Loading Skeleton */}
                   <div className="hidden md:block w-64 border-r border-border">
-                    <FileTree
-                      structure={project.structure}
-                      activeFilePath={project.activeFilePath}
-                      onFileClick={handleFileClick}
-                      onFolderToggle={toggleFolder}
-                      onNewFile={(path) => {
-                        createNewFile(path || 'new_file.rs');
-                      }}
-                      onNewFolder={(path) => {
-                        createNewFolder(path || 'new_folder');
-                      }}
-                      onRename={(oldPath, newName) => {
-                        const pathParts = oldPath.split('/');
-                        pathParts[pathParts.length - 1] = newName;
-                        const newPath = pathParts.join('/');
-                        rename(oldPath, newPath);
-                      }}
-                      onDuplicate={(path) => {
-                        duplicateFile(path);
-                      }}
-                      onDelete={(path, isFolder) => {
-                        if (isFolder) {
-                          removeFolder(path);
-                        } else {
-                          removeFile(path);
-                        }
-                      }}
-                    />
+                    {isLoadingGitHub ? (
+                      <FileTreeSkeleton />
+                    ) : (
+                      <FileTree
+                        structure={project.structure}
+                        activeFilePath={project.activeFilePath}
+                        onFileClick={handleFileClick}
+                        onFolderToggle={toggleFolder}
+                        onNewFile={(path) => {
+                          createNewFile(path || 'new_file.rs');
+                        }}
+                        onNewFolder={(path) => {
+                          createNewFolder(path || 'new_folder');
+                        }}
+                        onRename={(oldPath, newName) => {
+                          const pathParts = oldPath.split('/');
+                          pathParts[pathParts.length - 1] = newName;
+                          const newPath = pathParts.join('/');
+                          rename(oldPath, newPath);
+                        }}
+                        onDuplicate={(path) => {
+                          duplicateFile(path);
+                        }}
+                        onDelete={(path, isFolder) => {
+                          if (isFolder) {
+                            removeFolder(path);
+                          } else {
+                            removeFile(path);
+                          }
+                        }}
+                      />
+                    )}
                   </div>
-
+  
                   {/* Editor Section */}
                   <section className="flex-1 flex flex-col min-w-0">
                     <FileTabs
@@ -733,19 +802,19 @@ export default function HomePage() {
                       onNewFile={handleNewFile}
                       onRenameTab={renameTab}
                     />
-
+  
                     <div className="h-10 border-b border-border flex items-center justify-between px-2 sm:px-4 gap-2">
                       <div className="flex items-center gap-2 overflow-x-auto">
                         <span className="text-xs text-muted-foreground shrink-0">
                           {tabs.length} file{tabs.length !== 1 ? 's' : ''}
                         </span>
-
+  
                         {errors.length > 0 && (
                           <span className="text-xs bg-red-500/20 text-red-400 px-2 py-0.5 rounded-full shrink-0">
                             {errors.length} {errors.length === 1 ? 'error' : 'errors'}
                           </span>
                         )}
-
+  
                         {compilationTime !== null && (
                           <span className="hidden sm:flex text-xs text-muted-foreground items-center gap-1 shrink-0">
                             <Clock className="h-3 w-3" />
@@ -753,7 +822,7 @@ export default function HomePage() {
                           </span>
                         )}
                       </div>
-
+  
                       <div className="flex items-center gap-2 shrink-0">
                         <Button
                           onClick={handleCompile}
@@ -765,7 +834,7 @@ export default function HomePage() {
                         >
                           <Play className="h-3 w-3" />
                         </Button>
-
+  
                         <Button
                           variant="ghost"
                           size="sm"
@@ -777,7 +846,7 @@ export default function HomePage() {
                         </Button>
                       </div>
                     </div>
-
+  
                     <div className="flex-1 bg-card transition-all duration-300 min-h-0">
                       {activeTab ? (
                         <MonacoEditor
@@ -796,7 +865,7 @@ export default function HomePage() {
                     </div>
                   </section>
                 </div>
-
+  
                 {/* Bottom Panel - Output */}
                 <section
                   className={`
@@ -819,13 +888,13 @@ export default function HomePage() {
                         )}
                         {compilationStatus === 'error' && <XCircle className="h-4 w-4 text-red-400" />}
                       </button>
-
+  
                       {output.length > 0 && (
                         <span className="text-xs bg-primary/20 text-primary px-2 py-0.5 rounded-full shrink-0">
                           {output.length}
                         </span>
                       )}
-
+  
                       {compilationTime !== null && (
                         <span className="hidden sm:flex text-xs text-muted-foreground items-center gap-1 shrink-0">
                           <Clock className="h-3 w-3" />
@@ -833,7 +902,7 @@ export default function HomePage() {
                         </span>
                       )}
                     </div>
-
+  
                     <div className="flex items-center gap-1 sm:gap-2 shrink-0">
                       {output.length > 0 && (
                         <Button
@@ -847,7 +916,7 @@ export default function HomePage() {
                           <span className="hidden sm:inline">Clear</span>
                         </Button>
                       )}
-
+  
                       <Button
                         variant="ghost"
                         size="sm"
@@ -859,7 +928,7 @@ export default function HomePage() {
                       </Button>
                     </div>
                   </div>
-
+  
                   {showOutput && (
                     <div className="flex-1 overflow-auto p-2 sm:p-4 min-h-0 font-mono text-xs space-y-1 custom-scrollbar">
                       {output.length === 0 && !isCompiling && (
@@ -882,7 +951,7 @@ export default function HomePage() {
               </>
             )}
           </div>
-
+  
           {/* Right Sidebar - AI Panel */}
           {(showAIPanel || (!isAIPanelCollapsed && desktop)) && (
             <aside
@@ -903,7 +972,7 @@ export default function HomePage() {
                   <X className="h-5 w-5" />
                 </Button>
               </div>
-
+  
               <div className="flex-1 min-h-0 lg:h-full">
                 <ChatPanel
                   currentCode={activeTab?.content}
@@ -915,7 +984,7 @@ export default function HomePage() {
               </div>
             </aside>
           )}
-
+  
           {/* Right Sidebar - Contract Panel */}
           {(showContractPanel || (!isContractPanelCollapsed && desktop)) && (
             <aside
@@ -941,7 +1010,7 @@ export default function HomePage() {
                   <X className="h-5 w-5" />
                 </Button>
               </div>
-
+  
               <div className="flex-1 min-h-0 lg:h-full">
                 {deployedContracts.length > 0 && abiData.abi ? (
                   <ContractInteraction
@@ -954,7 +1023,7 @@ export default function HomePage() {
               </div>
             </aside>
           )}
-
+  
           {/* Mobile Overlay */}
           {(showAIPanel || showContractPanel) && (
             <div
@@ -964,9 +1033,9 @@ export default function HomePage() {
             />
           )}
         </div>
-
+  
         <KeyboardShortcutHint />
-
+  
         {parsedAbi && (
           <BenchmarkDialog
             open={showBenchmarkDialog}

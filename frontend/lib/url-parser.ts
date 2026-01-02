@@ -67,6 +67,17 @@ export function parseGitHubURL(url: string): GitHubURLInfo | null {
       }
     }
 
+    // Check for query parameters (override URL path values)
+    const searchParams = new URLSearchParams(urlObj.search);
+    const queryBranch = searchParams.get("branch");
+    const queryFile = searchParams.get("file");
+    const queryPath = searchParams.get("path");
+
+    // Query params take precedence
+    if (queryBranch) branch = queryBranch;
+    if (queryFile) file = queryFile;
+    if (queryPath) path = queryPath;
+
     return {
       type: "github",
       owner,

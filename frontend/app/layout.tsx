@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import { Providers } from "./providers";
+import { Toaster } from 'sonner';
 
 export const metadata: Metadata = {
   title: "Stylus IDE",
@@ -18,7 +19,10 @@ export default function RootLayout({
   return (
     <html lang="en" className="dark">
       <body style={{ fontFamily: systemFontStack }}>
-        <Providers>{children}</Providers>
+        <Providers>
+          {children}
+          <Toaster position="top-right" richColors /> 
+        </Providers>
       </body>
     </html>
   );

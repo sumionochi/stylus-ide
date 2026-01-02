@@ -82,6 +82,10 @@ export function clearProject(): void {
  */
 export function getLastSaveTime(): Date | null {
   try {
+    if (typeof window === "undefined") {
+      return null;
+    }
+
     const timestamp = localStorage.getItem(STORAGE_KEYS.LAST_SAVE);
     return timestamp ? new Date(timestamp) : null;
   } catch (error) {

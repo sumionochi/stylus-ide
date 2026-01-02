@@ -127,10 +127,44 @@ export function GitHubLoadingDialog({
 
           {/* Error Message */}
           {progress?.stage === 'error' && (
-            <Alert variant="destructive">
-              <XCircle className="h-4 w-4" />
-              <AlertDescription>{progress.message}</AlertDescription>
-            </Alert>
+            <div className="space-y-3">
+              <Alert variant="destructive">
+                <XCircle className="h-4 w-4" />
+                <AlertDescription className="whitespace-pre-wrap">
+                  {progress.message}
+                </AlertDescription>
+              </Alert>
+
+              {/* Help text for common errors */}
+              {progress.message.includes('rate limit') && (
+                <div className="text-xs text-muted-foreground space-y-1">
+                  <p className="font-semibold">To increase rate limits:</p>
+                  <ol className="list-decimal list-inside space-y-1">
+                    <li>Create a GitHub Personal Access Token</li>
+                    <li>Add NEXT_PUBLIC_GITHUB_TOKEN to .env.local</li>
+                    <li>Restart your dev server</li>
+                  </ol>
+                </div>
+              )}
+
+              {progress.message.includes('not found') && (
+                <div className="text-xs text-muted-foreground">
+                  <p>Make sure the repository URL is correct and the repository is public.</p>
+                </div>
+              )}
+
+              {progress.message.includes('private') && (
+                <div className="text-xs text-muted-foreground">
+                  <p>This repository is private. Public repositories only are supported.</p>
+                </div>
+              )}
+
+              {progress.message.includes('Network error') && (
+                <div className="text-xs text-muted-foreground">
+                  <p>Check your internet connection and try again.</p>
+                </div>
+              )}
+            </div>
           )}
 
           {/* Success Message */}

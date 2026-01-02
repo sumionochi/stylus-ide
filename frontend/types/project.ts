@@ -15,6 +15,7 @@ export interface ProjectFile {
   updatedAt: Date;
 }
 
+// ✅ KEEP ONLY THIS ONE ProjectState (delete the duplicate below)
 export interface ProjectState {
   id: string;
   name: string;
@@ -22,10 +23,10 @@ export interface ProjectState {
   files: ProjectFile[];
   structure: FileNode[];
   activeFilePath: string | null;
+  source: string;
   createdAt: Date;
   updatedAt: Date;
   metadata?: {
-    // ✅ ADD THIS
     source?: "github" | "blockchain" | "local";
     owner?: string;
     repo?: string;
@@ -34,6 +35,7 @@ export interface ProjectState {
     loadedAt?: string;
     chain?: string;
     address?: string;
+    folderPath?: string; // ✅ Make sure this is here
   };
 }
 
@@ -47,27 +49,18 @@ export interface FileNode {
   parentId?: string | null; // Parent folder ID
 }
 
-export interface ProjectState {
-  id: string;
-  name: string;
-  files: ProjectFile[];
-  structure: FileNode[];
-  activeFilePath: string | null;
-  source: string;
-  createdAt: Date;
-  updatedAt: Date;
-  metadata?: {
-    // ✅ ADD THIS (optional field)
-    source?: "github" | "blockchain" | "local";
-    owner?: string;
-    repo?: string;
-    branch?: string;
-    url?: string;
-    loadedAt?: string;
-    chain?: string;
-    address?: string;
-  };
-}
+// ❌ DELETE THIS DUPLICATE - You have ProjectState declared twice!
+// export interface ProjectState {
+//   id: string;
+//   name: string;
+//   files: ProjectFile[];
+//   structure: FileNode[];
+//   activeFilePath: string | null;
+//   source: string;
+//   createdAt: Date;
+//   updatedAt: Date;
+//   metadata?: { ... }
+// }
 
 export interface ProjectMetadata {
   // For GitHub-loaded projects
