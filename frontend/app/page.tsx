@@ -58,6 +58,10 @@ import { toast } from 'sonner';
 import { LoadFromGitHubDialog } from '@/components/github/LoadFromGitHubDialog';  
 import { FileTreeSkeleton } from '@/components/file-tree/FileTreeSkeleton';
 import { GitHubMetadataBanner } from '@/components/github/GitHubMetadataBanner';
+import { useBlockchainLoader } from '@/hooks/useBlockchainLoader';
+import { BlockchainLoadingDialog } from '@/components/blockchain/BlockchainLoadingDialog';
+import { ContractInteractionData } from '@/types/blockchain';
+import { BlockchainContractBanner } from '@/components/blockchain/BlockchainContractBanner';
 
 const DEFAULT_CODE = `// Welcome to Stylus IDE - Multi-File Project
 
@@ -157,6 +161,10 @@ export default function HomePage() {
   const [parsedAbi, setParsedAbi] = useState<any>(null);
   const { isLoading: isLoadingGitHub, progress: githubProgress, loadFromGitHub } = useGitHubLoader();
   const [showGitHubDialog, setShowGitHubDialog] = useState(false);
+const { isLoading: isLoadingBlockchain, progress: blockchainProgress, loadFromBlockchain } = useBlockchainLoader();
+const [showBlockchainDialog, setShowBlockchainDialog] = useState(false);
+const [loadedContract, setLoadedContract] = useState<ContractInteractionData | null>(null);
+
   const [workspaceTab, setWorkspaceTab] = useState<
   'editor' | 'orbit' | 'ml' | 'qlearning' | 'raytracing'
 >('editor');
@@ -219,6 +227,7 @@ export default function HomePage() {
   }, [abiData.abi]);
 
   // Update the existing handleURLLoad function
+// Update the existing handleURLLoad function
 const handleURLLoad = async (url: string) => {
   const parsed = parseURL(url);
 
@@ -255,7 +264,7 @@ const handleURLLoad = async (url: string) => {
           description: `Loaded ${project.files.length} files from ${parsed.owner}/${parsed.repo}`,
         });
 
-        // Clean URL after successful load (remove ?url= param)
+        // Clean URL after successful load
         if (typeof window !== 'undefined') {
           window.history.replaceState({}, '', window.location.pathname);
         }
@@ -266,22 +275,69 @@ const handleURLLoad = async (url: string) => {
         }, 1500);
       }
     } catch (error) {
-      // Error toast
       const errorMessage = error instanceof Error ? error.message : 'Failed to load repository';
       toast.error('Failed to load repository', {
         description: errorMessage,
       });
-      
-      // Keep dialog open on error so user can retry
     }
   } else if (parsed.type === 'blockchain') {
-    // TODO: Phase 3
-    toast.info('Coming soon', {
-      description: 'Blockchain loading will be available in Phase 3',
-    });
+    // ✅ NEW: Load contract for interaction (not editor)
+    setShowBlockchainDialog(true);
+    
+    try {
+      const contractData = await loadFromBlockchain(parsed);
+  
+      if (contractData) {
+        // Store contract data
+        setLoadedContract(contractData);
+        
+        // Parse ABI
+        let parsedAbi;
+        try {
+          parsedAbi = JSON.parse(contractData.abi);
+        } catch (e) {
+          console.error('Failed to parse ABI:', e);
+          throw new Error('Invalid ABI format');
+        }
+        
+        // Set ABI in state
+        setAbiData({ abi: contractData.abi, solidity: '' });
+        
+        // Add to deployed contracts list
+        setDeployedContracts([
+          {
+            address: contractData.address,
+            txHash: `loaded-from-${contractData.chain}`, // Optional: helps identify source
+          }
+        ]);
+
+        // Open contract interaction panel
+        setShowContractPanel(true);
+        
+        // Show success toast
+        toast.success('Contract loaded!', {
+          description: `${contractData.name} is ready for interaction`,
+        });
+  
+        // Clean URL after successful load
+        if (typeof window !== 'undefined') {
+          window.history.replaceState({}, '', window.location.pathname);
+        }
+  
+        // Close dialog after 1.5 seconds
+        setTimeout(() => {
+          setShowBlockchainDialog(false);
+        }, 1500);
+      }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to load contract';
+      toast.error('Failed to load contract', {
+        description: errorMessage,
+      });
+    }
   } else {
     toast.error('Invalid URL', {
-      description: 'Please use a GitHub repository URL',
+      description: 'Please use a GitHub repository or blockchain explorer URL',
     });
   }
 };
@@ -504,6 +560,18 @@ const handleURLLoad = async (url: string) => {
           if (url) handleURLLoad(url);
         }}
       />
+
+      {/* ✅ NEW: Blockchain Loading Dialog */}
+    <BlockchainLoadingDialog
+      open={showBlockchainDialog}
+      onOpenChange={setShowBlockchainDialog}
+      progress={blockchainProgress}
+      onRetry={() => {
+        const searchParams = new URLSearchParams(window.location.search);
+        const url = searchParams.get('url');
+        if (url) handleURLLoad(url);
+      }}
+    />
   
       <ABIDialog
         open={showABIDialog}
@@ -728,6 +796,18 @@ const handleURLLoad = async (url: string) => {
             branch={project.metadata.branch || 'main'}
             url={project.metadata.url || `https://github.com/${project.metadata.owner}/${project.metadata.repo}`}
             folderPath={project.metadata.folderPath}  // ✅ ADD THIS
+          />
+        )}
+
+        {/* ✅ NEW: Blockchain Contract Banner */}
+        {loadedContract && (
+          <BlockchainContractBanner
+            address={loadedContract.address}
+            name={loadedContract.name}
+            chain={loadedContract.chain}
+            verified={loadedContract.verified}
+            explorerUrl={loadedContract.explorerUrl}
+            compiler={loadedContract.compiler}
           />
         )}
   
