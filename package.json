@@ -1,6 +1,6 @@
 {
     "name": "create-stylus-ide",
-    "version": "1.0.1",
+    "version": "1.0.2",
     "description": "The Ultimate Web-Based Development Environment for Arbitrum Stylus Smart Contracts",
     "main": "cli.js",
     "bin": {
