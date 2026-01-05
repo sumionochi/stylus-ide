@@ -1,0 +1,30 @@
+{
+    "name": "create-stylus-ide",
+    "version": "1.0.0",
+    "description": "The Ultimate Web-Based Development Environment for Arbitrum Stylus Smart Contracts",
+    "main": "cli.js",
+    "bin": {
+      "stylus-ide": "./cli.js"
+    },
+    "scripts": {
+      "postinstall": "cd frontend && npm install",
+      "start": "node cli.js",
+      "dev": "cd frontend && npm run dev",
+      "setup": "cd frontend && npm run setup",
+      "check-env": "cd frontend && npm run check-env",
+      "ml:train": "python ml-training/train_tiny_model.py"
+    },
+    "files": [
+      "frontend",
+      "ml-training",
+      "cli.js"
+    ],
+    "keywords": [
+      "ide",
+      "stylus",
+      "nextjs",
+      "ml"
+    ],
+    "author": "Aaditya Srivastava",
+    "license": "ISC"
+  }

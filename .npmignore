@@ -1,0 +1,19 @@
+# Ignore version control
+.git
+.gitignore
+
+# Ignore local environment secrets (CRITICAL)
+.env
+.env.local
+frontend/.env.local
+frontend/.env
+
+# Ignore node_modules (let the user install them via postinstall)
+node_modules
+frontend/node_modules
+frontend/.next
+
+# Ignore Python virtual environments and caches
+ml-training/venv
+ml-training/__pycache__
+*.pyc

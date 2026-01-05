@@ -9,9 +9,12 @@
         "Chainlist",
         "codegen",
         "getsourcecode",
+        "Mgmt",
         "numpy",
+        "println",
         "QLEARNING",
         "scikit",
+        "sumionochi",
         "thirdweb"
     ]
 }

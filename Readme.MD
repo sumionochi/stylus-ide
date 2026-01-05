@@ -1215,9 +1215,8 @@ Etherscan:
   - Endpoint: api.etherscan.io/v2/api
   - Chains: Arbitrum, Ethereum, Base, Polygon
 
-Anthropic Claude:
-  - Claude 3.5 Sonnet
-  - Streaming API
+OpenAI:
+  - Open AI Api
   - Context: Code + errors
 ```
 
