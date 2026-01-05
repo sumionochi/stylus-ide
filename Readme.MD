@@ -8,8 +8,6 @@
 ![Arbitrum](https://img.shields.io/badge/Arbitrum-Ready-orange?style=for-the-badge&logo=ethereum&logoColor=white)
 ![License](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)
 
-**[Live Demo](https://your-deployed-url.vercel.app)** • **[Documentation](#documentation)** • **[Video Demo](#demo-video)** • **[GitHub](https://github.com/your-username/stylus-ide)**
-
 _Build, Deploy, and Interact with Rust Smart Contracts - All in Your Browser_
 
 </div>
@@ -776,11 +774,17 @@ MetaMask or Web3 wallet (for deployment)
 
 ```bash
 # Clone repository
-git clone https://github.com/your-username/stylus-ide.git
+git clone https://github.com/sumionochi/stylus-ide.git
 cd stylus-ide
 
 # Install dependencies
 npm install
+npm run ml:train
+npm run setup
+npm run check-env
+
+cd frontend
+npm run dev
 
 # Set up environment variables
 cp .env.local.example .env.local
@@ -1215,8 +1219,9 @@ Etherscan:
   - Endpoint: api.etherscan.io/v2/api
   - Chains: Arbitrum, Ethereum, Base, Polygon
 
-OpenAI:
-  - Open AI Api
+Anthropic Claude:
+  - Claude 3.5 Sonnet
+  - Streaming API
   - Context: Code + errors
 ```
 
