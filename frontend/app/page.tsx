@@ -43,7 +43,7 @@ import { KeyboardShortcutHint } from '@/components/ui/KeyboardShortcutHint';
 import { BenchmarkDialog } from '@/components/orbit/BenchmarkDialog';
 import { OrbitExplorer } from '@/components/orbit/OrbitExplorer';
 import { ProjectActions } from '@/components/project/ProjectActions';
-import { getFileByPath, buildFileTree } from '@/lib/project-manager'; 
+import { getFileByPath, buildFileTree } from '@/lib/project-manager';
 import { FileTree } from '@/components/file-tree/FileTree';
 import { useProjectState } from '@/hooks/useProjectState';
 import { templates, getTemplate } from '@/lib/templates';
@@ -54,8 +54,8 @@ import { usePanelState } from '@/hooks/usePanelState';
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
 import { useResponsive } from '@/hooks/useResponsive';
 import { ProjectState } from '@/types/project';
-import { toast } from 'sonner'; 
-import { LoadFromGitHubDialog } from '@/components/github/LoadFromGitHubDialog';  
+import { toast } from 'sonner';
+import { LoadFromGitHubDialog } from '@/components/github/LoadFromGitHubDialog';
 import { FileTreeSkeleton } from '@/components/file-tree/FileTreeSkeleton';
 import { GitHubMetadataBanner } from '@/components/github/GitHubMetadataBanner';
 import { useBlockchainLoader } from '@/hooks/useBlockchainLoader';
@@ -161,13 +161,13 @@ export default function HomePage() {
   const [parsedAbi, setParsedAbi] = useState<any>(null);
   const { isLoading: isLoadingGitHub, progress: githubProgress, loadFromGitHub } = useGitHubLoader();
   const [showGitHubDialog, setShowGitHubDialog] = useState(false);
-const { isLoading: isLoadingBlockchain, progress: blockchainProgress, loadFromBlockchain } = useBlockchainLoader();
-const [showBlockchainDialog, setShowBlockchainDialog] = useState(false);
-const [loadedContract, setLoadedContract] = useState<ContractInteractionData | null>(null);
+  const { isLoading: isLoadingBlockchain, progress: blockchainProgress, loadFromBlockchain } = useBlockchainLoader();
+  const [showBlockchainDialog, setShowBlockchainDialog] = useState(false);
+  const [loadedContract, setLoadedContract] = useState<ContractInteractionData | null>(null);
 
   const [workspaceTab, setWorkspaceTab] = useState<
-  'editor' | 'orbit' | 'ml' | 'qlearning' | 'raytracing'
->('editor');
+    'editor' | 'orbit' | 'ml' | 'qlearning' | 'raytracing'
+  >('editor');
 
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
@@ -196,18 +196,18 @@ const [loadedContract, setLoadedContract] = useState<ContractInteractionData | n
       const branch = searchParams.get('branch');
       const file = searchParams.get('file');
       const path = searchParams.get('path');
-      
+
       let fullUrl = url;
       const params = new URLSearchParams();
-      
+
       if (branch) params.set('branch', branch);
       if (file) params.set('file', file);
       if (path) params.set('path', path);
-      
+
       if (params.toString()) {
         fullUrl += (url.includes('?') ? '&' : '?') + params.toString();
       }
-      
+
       handleURLLoad(fullUrl);
     }
   }, []);
@@ -227,120 +227,120 @@ const [loadedContract, setLoadedContract] = useState<ContractInteractionData | n
   }, [abiData.abi]);
 
   // Update the existing handleURLLoad function
-// Update the existing handleURLLoad function
-const handleURLLoad = async (url: string) => {
-  const parsed = parseURL(url);
+  // Update the existing handleURLLoad function
+  const handleURLLoad = async (url: string) => {
+    const parsed = parseURL(url);
 
-  if (parsed.type === 'github') {
-    setShowGitHubDialog(true);
-    
-    try {
-      const project = await loadFromGitHub(parsed);
+    if (parsed.type === 'github') {
+      setShowGitHubDialog(true);
 
-      if (project) {
-        // Load project into IDE
-        setProject(project);
-        
-        // Build file tree structure from files
-        const updatedProject = {
-          ...project,
-          structure: buildFileTree(project.files),
-        };
-        setProject(updatedProject);
+      try {
+        const project = await loadFromGitHub(parsed);
 
-        // Open first Rust file in tab
-        const firstRustFile = project.files.find((f) => f.language === 'rust' && f.isOpen);
-        if (firstRustFile) {
-          openOrActivateTab(
-            firstRustFile.path,
-            firstRustFile.name,
-            firstRustFile.content,
-            firstRustFile.language
-          );
-        }
+        if (project) {
+          // Load project into IDE
+          setProject(project);
 
-        // Show success toast
-        toast.success('Repository loaded!', {
-          description: `Loaded ${project.files.length} files from ${parsed.owner}/${parsed.repo}`,
-        });
+          // Build file tree structure from files
+          const updatedProject = {
+            ...project,
+            structure: buildFileTree(project.files),
+          };
+          setProject(updatedProject);
 
-        // Clean URL after successful load
-        if (typeof window !== 'undefined') {
-          window.history.replaceState({}, '', window.location.pathname);
-        }
-
-        // Close dialog after 1.5 seconds
-        setTimeout(() => {
-          setShowGitHubDialog(false);
-        }, 1500);
-      }
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Failed to load repository';
-      toast.error('Failed to load repository', {
-        description: errorMessage,
-      });
-    }
-  } else if (parsed.type === 'blockchain') {
-    // ✅ NEW: Load contract for interaction (not editor)
-    setShowBlockchainDialog(true);
-    
-    try {
-      const contractData = await loadFromBlockchain(parsed);
-  
-      if (contractData) {
-        // Store contract data
-        setLoadedContract(contractData);
-        
-        // Parse ABI
-        let parsedAbi;
-        try {
-          parsedAbi = JSON.parse(contractData.abi);
-        } catch (e) {
-          console.error('Failed to parse ABI:', e);
-          throw new Error('Invalid ABI format');
-        }
-        
-        // Set ABI in state
-        setAbiData({ abi: contractData.abi, solidity: '' });
-        
-        // Add to deployed contracts list
-        setDeployedContracts([
-          {
-            address: contractData.address,
-            txHash: `loaded-from-${contractData.chain}`, // Optional: helps identify source
+          // Open first Rust file in tab
+          const firstRustFile = project.files.find((f) => f.language === 'rust' && f.isOpen);
+          if (firstRustFile) {
+            openOrActivateTab(
+              firstRustFile.path,
+              firstRustFile.name,
+              firstRustFile.content,
+              firstRustFile.language
+            );
           }
-        ]);
 
-        // Open contract interaction panel
-        setShowContractPanel(true);
-        
-        // Show success toast
-        toast.success('Contract loaded!', {
-          description: `${contractData.name} is ready for interaction`,
-        });
-  
-        // Clean URL after successful load
-        if (typeof window !== 'undefined') {
-          window.history.replaceState({}, '', window.location.pathname);
+          // Show success toast
+          toast.success('Repository loaded!', {
+            description: `Loaded ${project.files.length} files from ${parsed.owner}/${parsed.repo}`,
+          });
+
+          // Clean URL after successful load
+          if (typeof window !== 'undefined') {
+            window.history.replaceState({}, '', window.location.pathname);
+          }
+
+          // Close dialog after 1.5 seconds
+          setTimeout(() => {
+            setShowGitHubDialog(false);
+          }, 1500);
         }
-  
-        // Close dialog after 1.5 seconds
-        setTimeout(() => {
-          setShowBlockchainDialog(false);
-        }, 1500);
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : 'Failed to load repository';
+        toast.error('Failed to load repository', {
+          description: errorMessage,
+        });
       }
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Failed to load contract';
-      toast.error('Failed to load contract', {
-        description: errorMessage,
+    } else if (parsed.type === 'blockchain') {
+      // ✅ NEW: Load contract for interaction (not editor)
+      setShowBlockchainDialog(true);
+
+      try {
+        const contractData = await loadFromBlockchain(parsed);
+
+        if (contractData) {
+          // Store contract data
+          setLoadedContract(contractData);
+
+          // Parse ABI
+          let parsedAbi;
+          try {
+            parsedAbi = JSON.parse(contractData.abi);
+          } catch (e) {
+            console.error('Failed to parse ABI:', e);
+            throw new Error('Invalid ABI format');
+          }
+
+          // Set ABI in state
+          setAbiData({ abi: contractData.abi, solidity: '' });
+
+          // Add to deployed contracts list
+          setDeployedContracts([
+            {
+              address: contractData.address,
+              txHash: `loaded-from-${contractData.chain}`, // Optional: helps identify source
+            }
+          ]);
+
+          // Open contract interaction panel
+          setShowContractPanel(true);
+
+          // Show success toast
+          toast.success('Contract loaded!', {
+            description: `${contractData.name} is ready for interaction`,
+          });
+
+          // Clean URL after successful load
+          if (typeof window !== 'undefined') {
+            window.history.replaceState({}, '', window.location.pathname);
+          }
+
+          // Close dialog after 1.5 seconds
+          setTimeout(() => {
+            setShowBlockchainDialog(false);
+          }, 1500);
+        }
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : 'Failed to load contract';
+        toast.error('Failed to load contract', {
+          description: errorMessage,
+        });
+      }
+    } else {
+      toast.error('Invalid URL', {
+        description: 'Please use a GitHub repository or blockchain explorer URL',
       });
     }
-  } else {
-    toast.error('Invalid URL', {
-      description: 'Please use a GitHub repository or blockchain explorer URL',
-    });
-  }
-};
+  };
 
   // NEW: Sync file tree clicks with tabs
   const handleFileClick = (path: string) => {
@@ -349,7 +349,7 @@ const handleURLLoad = async (url: string) => {
 
     // Open or activate tab
     openOrActivateTab(path, file.name, file.content, file.language);
-    
+
     // Update project active file
     setActive(path);
   };
@@ -392,14 +392,14 @@ const handleURLLoad = async (url: string) => {
     onToggleAI: () => {
       if (mobile) {
         setShowContractPanel(false);
-        toggleAIPanel(); 
+        toggleAIPanel();
         return;
       }
       toggleAIPanelCollapse();
     },
     onToggleOutput: toggleOutput,
     onCompile: handleCompile,
-  });  
+  });
 
   const handleLoadTemplate = (templateId: string) => {
     const template = getTemplate(templateId);
@@ -466,11 +466,11 @@ const handleURLLoad = async (url: string) => {
         if (result.details && result.details.includes('solc not found')) {
           alert(
             'solc (Solidity compiler) is required for ABI export.\n\n' +
-              'Install it:\n' +
-              '• macOS: brew install solidity\n' +
-              '• Linux: sudo apt-get install solc\n' +
-              '• Windows: Download from github.com/ethereum/solidity/releases\n\n' +
-              'Then try exporting again.'
+            'Install it:\n' +
+            '• macOS: brew install solidity\n' +
+            '• Linux: sudo apt-get install solc\n' +
+            '• Windows: Download from github.com/ethereum/solidity/releases\n\n' +
+            'Then try exporting again.'
           );
         } else {
           const errorMsg = result.details
@@ -548,7 +548,7 @@ const handleURLLoad = async (url: string) => {
   return (
     <>
       <SetupGuide />
-  
+
       {/* NEW: GitHub Loading Dialog */}
       <GitHubLoadingDialog
         open={showGitHubDialog}
@@ -562,31 +562,31 @@ const handleURLLoad = async (url: string) => {
       />
 
       {/* ✅ NEW: Blockchain Loading Dialog */}
-    <BlockchainLoadingDialog
-      open={showBlockchainDialog}
-      onOpenChange={setShowBlockchainDialog}
-      progress={blockchainProgress}
-      onRetry={() => {
-        const searchParams = new URLSearchParams(window.location.search);
-        const url = searchParams.get('url');
-        if (url) handleURLLoad(url);
-      }}
-    />
-  
+      <BlockchainLoadingDialog
+        open={showBlockchainDialog}
+        onOpenChange={setShowBlockchainDialog}
+        progress={blockchainProgress}
+        onRetry={() => {
+          const searchParams = new URLSearchParams(window.location.search);
+          const url = searchParams.get('url');
+          if (url) handleURLLoad(url);
+        }}
+      />
+
       <ABIDialog
         open={showABIDialog}
         onOpenChange={setShowABIDialog}
         abi={abiData.abi}
         solidity={abiData.solidity}
       />
-  
+
       <DeployDialog
         open={showDeployDialog}
         onOpenChange={setShowDeployDialog}
         sessionId={sessionId}
         onDeploySuccess={handleDeploySuccess}
       />
-  
+
       <main className="h-screen flex flex-col bg-background">
         {/* Header */}
         <header className="border-b border-border px-3 py-2 md:px-4 md:py-0 md:h-14 flex items-center justify-between gap-2 flex-wrap">
@@ -605,40 +605,24 @@ const handleURLLoad = async (url: string) => {
               )}
             </div>
           </div>
-  
+
           <div className="flex items-center gap-2 flex-wrap justify-end">
             <ConnectButton />
-            
+
             <FaucetButton />
-            {/* NEW: Load from GitHub Button */}
-            <LoadFromGitHubDialog 
-              onLoadURL={handleURLLoad}
-              isLoading={isLoadingGitHub}
-            />
+  
             <ProjectActions
               project={project}
               onImport={handleImportProject}
               onReset={resetProject}
               onSave={manualSave}
-            />  
-  
+            />
+
             <Button onClick={handleCompile} disabled={isCompiling} size="sm" className="hidden sm:flex">
               <Play className="h-4 w-4 mr-2" />
               {isCompiling ? 'Compiling...' : 'Compile'}
             </Button>
-  
-            {abiData.abi && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setShowBenchmarkDialog(true)}
-                className="hidden lg:flex"
-              >
-                <Zap className="h-4 w-4 mr-2" />
-                Benchmark Orbit
-              </Button>
-            )}
-  
+
             <Button
               onClick={handleExportABI}
               disabled={!canExportAbi}
@@ -649,7 +633,7 @@ const handleURLLoad = async (url: string) => {
               <Download className="h-4 w-4 mr-2" />
               {isExportingABI ? 'Exporting...' : 'Export ABI'}
             </Button>
-  
+
             <Button
               onClick={() => setShowDeployDialog(true)}
               disabled={!canDeploy}
@@ -659,7 +643,7 @@ const handleURLLoad = async (url: string) => {
               <Upload className="h-4 w-4 mr-2" />
               Deploy
             </Button>
-  
+
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="outline" size="sm" className="hidden md:flex">
@@ -678,7 +662,7 @@ const handleURLLoad = async (url: string) => {
                 ))}
               </DropdownMenuContent>
             </DropdownMenu>
-  
+
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="outline" size="icon" className="sm:hidden" aria-label="Actions">
@@ -690,24 +674,17 @@ const handleURLLoad = async (url: string) => {
                   <Play className="h-4 w-4 mr-2" />
                   {isCompiling ? 'Compiling...' : 'Compile'}
                 </DropdownMenuItem>
-  
+
                 <DropdownMenuItem onClick={handleExportABI} disabled={!canExportAbi}>
                   <Download className="h-4 w-4 mr-2" />
                   {isExportingABI ? 'Exporting ABI…' : 'Export ABI'}
                 </DropdownMenuItem>
-  
+
                 <DropdownMenuItem onClick={() => setShowDeployDialog(true)} disabled={!canDeploy}>
                   <Upload className="h-4 w-4 mr-2" />
                   Deploy
                 </DropdownMenuItem>
-  
-                {abiData.abi && (
-                  <DropdownMenuItem onClick={() => setShowBenchmarkDialog(true)}>
-                    <Zap className="h-4 w-4 mr-2" />
-                    Benchmark Orbit
-                  </DropdownMenuItem>
-                )}
-  
+
                 <div className="px-2 py-1.5 text-xs text-muted-foreground">Templates</div>
                 {templates.map((template) => (
                   <DropdownMenuItem key={template.id} onClick={() => handleLoadTemplate(template.id)}>
@@ -719,7 +696,7 @@ const handleURLLoad = async (url: string) => {
                 ))}
               </DropdownMenuContent>
             </DropdownMenu>
-  
+
             <Button
               variant="ghost"
               size="icon"
@@ -729,7 +706,7 @@ const handleURLLoad = async (url: string) => {
             >
               <Bot className="h-5 w-5" />
             </Button>
-  
+
             <Button
               variant="ghost"
               size="icon"
@@ -741,7 +718,7 @@ const handleURLLoad = async (url: string) => {
             </Button>
           </div>
         </header>
-  
+
         {/* Workspace Tabs Bar */}
         <div className="h-10 border-b border-border bg-card flex items-center px-2 sm:px-4 gap-2 overflow-x-auto whitespace-nowrap">
           <Button
@@ -785,19 +762,19 @@ const handleURLLoad = async (url: string) => {
             Raytracing
           </Button>
         </div>
-  
+
         {/* NEW: GitHub Metadata Banner */}
-        {project.metadata?.source === 'github' && 
-        project.metadata.owner && 
-        project.metadata.repo && (
-          <GitHubMetadataBanner
-            owner={project.metadata.owner}
-            repo={project.metadata.repo}
-            branch={project.metadata.branch || 'main'}
-            url={project.metadata.url || `https://github.com/${project.metadata.owner}/${project.metadata.repo}`}
-            folderPath={project.metadata.folderPath}  // ✅ ADD THIS
-          />
-        )}
+        {project.metadata?.source === 'github' &&
+          project.metadata.owner &&
+          project.metadata.repo && (
+            <GitHubMetadataBanner
+              owner={project.metadata.owner}
+              repo={project.metadata.repo}
+              branch={project.metadata.branch || 'main'}
+              url={project.metadata.url || `https://github.com/${project.metadata.owner}/${project.metadata.repo}`}
+              folderPath={project.metadata.folderPath}  // ✅ ADD THIS
+            />
+          )}
 
         {/* ✅ NEW: Blockchain Contract Banner */}
         {loadedContract && (
@@ -810,7 +787,7 @@ const handleURLLoad = async (url: string) => {
             compiler={loadedContract.compiler}
           />
         )}
-  
+
         {/* Main Content Area */}
         <div className="flex-1 flex flex-col lg:flex-row overflow-hidden">
           <div className="flex-1 flex flex-col min-w-0 relative">
@@ -871,7 +848,7 @@ const handleURLLoad = async (url: string) => {
                       />
                     )}
                   </div>
-  
+
                   {/* Editor Section */}
                   <section className="flex-1 flex flex-col min-w-0">
                     <FileTabs
@@ -882,19 +859,19 @@ const handleURLLoad = async (url: string) => {
                       onNewFile={handleNewFile}
                       onRenameTab={renameTab}
                     />
-  
+
                     <div className="h-10 border-b border-border flex items-center justify-between px-2 sm:px-4 gap-2">
                       <div className="flex items-center gap-2 overflow-x-auto">
                         <span className="text-xs text-muted-foreground shrink-0">
                           {tabs.length} file{tabs.length !== 1 ? 's' : ''}
                         </span>
-  
+
                         {errors.length > 0 && (
                           <span className="text-xs bg-red-500/20 text-red-400 px-2 py-0.5 rounded-full shrink-0">
                             {errors.length} {errors.length === 1 ? 'error' : 'errors'}
                           </span>
                         )}
-  
+
                         {compilationTime !== null && (
                           <span className="hidden sm:flex text-xs text-muted-foreground items-center gap-1 shrink-0">
                             <Clock className="h-3 w-3" />
@@ -902,7 +879,7 @@ const handleURLLoad = async (url: string) => {
                           </span>
                         )}
                       </div>
-  
+
                       <div className="flex items-center gap-2 shrink-0">
                         <Button
                           onClick={handleCompile}
@@ -914,7 +891,7 @@ const handleURLLoad = async (url: string) => {
                         >
                           <Play className="h-3 w-3" />
                         </Button>
-  
+
                         <Button
                           variant="ghost"
                           size="sm"
@@ -926,7 +903,7 @@ const handleURLLoad = async (url: string) => {
                         </Button>
                       </div>
                     </div>
-  
+
                     <div className="flex-1 bg-card transition-all duration-300 min-h-0">
                       {activeTab ? (
                         <MonacoEditor
@@ -945,7 +922,7 @@ const handleURLLoad = async (url: string) => {
                     </div>
                   </section>
                 </div>
-  
+
                 {/* Bottom Panel - Output */}
                 <section
                   className={`
@@ -968,13 +945,13 @@ const handleURLLoad = async (url: string) => {
                         )}
                         {compilationStatus === 'error' && <XCircle className="h-4 w-4 text-red-400" />}
                       </button>
-  
+
                       {output.length > 0 && (
                         <span className="text-xs bg-primary/20 text-primary px-2 py-0.5 rounded-full shrink-0">
                           {output.length}
                         </span>
                       )}
-  
+
                       {compilationTime !== null && (
                         <span className="hidden sm:flex text-xs text-muted-foreground items-center gap-1 shrink-0">
                           <Clock className="h-3 w-3" />
@@ -982,7 +959,7 @@ const handleURLLoad = async (url: string) => {
                         </span>
                       )}
                     </div>
-  
+
                     <div className="flex items-center gap-1 sm:gap-2 shrink-0">
                       {output.length > 0 && (
                         <Button
@@ -996,7 +973,7 @@ const handleURLLoad = async (url: string) => {
                           <span className="hidden sm:inline">Clear</span>
                         </Button>
                       )}
-  
+
                       <Button
                         variant="ghost"
                         size="sm"
@@ -1008,7 +985,7 @@ const handleURLLoad = async (url: string) => {
                       </Button>
                     </div>
                   </div>
-  
+
                   {showOutput && (
                     <div className="flex-1 overflow-auto p-2 sm:p-4 min-h-0 font-mono text-xs space-y-1 custom-scrollbar">
                       {output.length === 0 && !isCompiling && (
@@ -1031,17 +1008,16 @@ const handleURLLoad = async (url: string) => {
               </>
             )}
           </div>
-  
+
           {/* Right Sidebar - AI Panel */}
           {(showAIPanel || (!isAIPanelCollapsed && desktop)) && (
             <aside
               className={`
                 transition-all duration-300 ease-in-out
                 ${showAIPanel && mobile ? 'fixed inset-0 z-50 bg-card' : 'hidden lg:block'}
-                ${
-                  isAIPanelCollapsed
-                    ? 'lg:w-0 lg:min-w-0 lg:max-w-0 lg:overflow-hidden'
-                    : 'lg:w-96 lg:max-w-100 lg:min-w-[320px]'
+                ${isAIPanelCollapsed
+                  ? 'lg:w-0 lg:min-w-0 lg:max-w-0 lg:overflow-hidden'
+                  : 'lg:w-96 lg:max-w-100 lg:min-w-[320px]'
                 }
                 border-l border-border bg-card flex flex-col
               `}
@@ -1052,7 +1028,7 @@ const handleURLLoad = async (url: string) => {
                   <X className="h-5 w-5" />
                 </Button>
               </div>
-  
+
               <div className="flex-1 min-h-0 lg:h-full">
                 <ChatPanel
                   currentCode={activeTab?.content}
@@ -1064,17 +1040,16 @@ const handleURLLoad = async (url: string) => {
               </div>
             </aside>
           )}
-  
+
           {/* Right Sidebar - Contract Panel */}
           {(showContractPanel || (!isContractPanelCollapsed && desktop)) && (
             <aside
               className={`
                 transition-all duration-300 ease-in-out
                 ${showContractPanel && mobile ? 'fixed inset-0 z-50 bg-card' : 'hidden lg:block'}
-                ${
-                  isContractPanelCollapsed
-                    ? 'lg:w-0 lg:min-w-0 lg:max-w-0 lg:overflow-hidden'
-                    : 'lg:w-96 lg:max-w-100 lg:min-w-[320px]'
+                ${isContractPanelCollapsed
+                  ? 'lg:w-0 lg:min-w-0 lg:max-w-0 lg:overflow-hidden'
+                  : 'lg:w-96 lg:max-w-100 lg:min-w-[320px]'
                 }
                 border-l border-border bg-card flex flex-col
               `}
@@ -1090,7 +1065,7 @@ const handleURLLoad = async (url: string) => {
                   <X className="h-5 w-5" />
                 </Button>
               </div>
-  
+
               <div className="flex-1 min-h-0 lg:h-full">
                 {deployedContracts.length > 0 && abiData.abi ? (
                   <ContractInteraction
@@ -1103,7 +1078,7 @@ const handleURLLoad = async (url: string) => {
               </div>
             </aside>
           )}
-  
+
           {/* Mobile Overlay */}
           {(showAIPanel || showContractPanel) && (
             <div
@@ -1113,9 +1088,9 @@ const handleURLLoad = async (url: string) => {
             />
           )}
         </div>
-  
+
         <KeyboardShortcutHint />
-  
+
         {parsedAbi && (
           <BenchmarkDialog
             open={showBenchmarkDialog}

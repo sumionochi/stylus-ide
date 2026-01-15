@@ -27,29 +27,29 @@ export function BlockchainContractBanner({
           <Shield className="h-3.5 w-3.5" />
           <span className="font-medium">{name}</span>
         </div>
-        
+
         <div className="flex items-center gap-1.5 text-muted-foreground">
           <span className="font-mono">{address.slice(0, 6)}...{address.slice(-4)}</span>
         </div>
-        
+
         <div className="flex items-center gap-1.5 text-muted-foreground">
           <span>on {chain}</span>
         </div>
-        
+
         {verified && (
           <div className="flex items-center gap-1 text-green-600 dark:text-green-400">
             <CheckCircle className="h-3 w-3" />
             <span className="text-xs">Verified</span>
           </div>
         )}
-        
+
         {compiler && (
           <div className="hidden md:block text-muted-foreground text-xs">
             {compiler}
           </div>
         )}
       </div>
-      
+
       <Button
         variant="ghost"
         size="sm"
